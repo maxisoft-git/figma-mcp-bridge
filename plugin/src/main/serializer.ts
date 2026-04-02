@@ -122,31 +122,134 @@ const serializeText = (node: TextNode, base: SerializedNode) => {
       textAlignHorizontal: isMixed(node.textAlignHorizontal)
         ? "mixed"
         : node.textAlignHorizontal,
+      textAlignVertical: node.textAlignVertical,
+      textAutoResize: node.textAutoResize,
     },
   };
 };
 
+const serializeEffects = (effects: readonly Effect[]) =>
+  effects
+    .filter((e) => e.visible !== false)
+    .map((effect) => {
+      const base: Record<string, unknown> = { type: effect.type };
+      if ("color" in effect && effect.color) {
+        base.color = toHex(effect.color);
+        base.opacity = effect.color.a;
+      }
+      if ("offset" in effect && effect.offset) {
+        base.offset = { x: effect.offset.x, y: effect.offset.y };
+      }
+      if ("radius" in effect) base.radius = effect.radius;
+      if ("spread" in effect) base.spread = effect.spread;
+      if ("blendMode" in effect) base.blendMode = effect.blendMode;
+      return base;
+    });
+
 const serializeStyles = (node: SceneNode) => {
   const styles: Record<string, unknown> = {};
+
+  // Opacity & blend
+  if ("opacity" in node) styles.opacity = node.opacity;
+  if ("blendMode" in node) styles.blendMode = node.blendMode;
+  if ("visible" in node) styles.visible = node.visible;
+
+  // Fills & strokes
   if ("fills" in node) {
     styles.fills = serializePaints(node.fills);
   }
   if ("strokes" in node) {
     styles.strokes = serializePaints(node.strokes);
   }
+  if ("strokeWeight" in node) {
+    styles.strokeWeight = isMixed(node.strokeWeight)
+      ? "mixed"
+      : node.strokeWeight;
+  }
+  if ("strokeAlign" in node) styles.strokeAlign = node.strokeAlign;
+  if ("dashPattern" in node && node.dashPattern.length > 0) {
+    styles.dashPattern = [...node.dashPattern];
+  }
+
+  // Effects (shadows, blurs)
+  if ("effects" in node) {
+    const effects = (node as BlendMixin).effects;
+    if (effects.length > 0) {
+      styles.effects = serializeEffects(effects);
+    }
+  }
+
+  // Corner radius
   if ("cornerRadius" in node) {
     styles.cornerRadius = isMixed(node.cornerRadius)
       ? "mixed"
       : node.cornerRadius;
   }
-  if ("paddingLeft" in node) {
-    styles.padding = {
-      top: node.paddingTop,
-      right: node.paddingRight,
-      bottom: node.paddingBottom,
-      left: node.paddingLeft,
+  if ("topLeftRadius" in node) {
+    const n = node as RectangleCornerMixin;
+    if (
+      n.topLeftRadius !== n.topRightRadius ||
+      n.topLeftRadius !== n.bottomRightRadius ||
+      n.topLeftRadius !== n.bottomLeftRadius
+    ) {
+      styles.cornerRadii = {
+        topLeft: n.topLeftRadius,
+        topRight: n.topRightRadius,
+        bottomRight: n.bottomRightRadius,
+        bottomLeft: n.bottomLeftRadius,
+      };
+    }
+  }
+  if ("cornerSmoothing" in node && (node as CornerMixin).cornerSmoothing > 0) {
+    styles.cornerSmoothing = (node as CornerMixin).cornerSmoothing;
+  }
+
+  // Auto-layout
+  if ("layoutMode" in node && (node as AutoLayoutMixin).layoutMode !== "NONE") {
+    const n = node as AutoLayoutMixin;
+    styles.autoLayout = {
+      direction: n.layoutMode,
+      gap: n.itemSpacing,
+      primaryAxisAlign: n.primaryAxisAlignItems,
+      counterAxisAlign: n.counterAxisAlignItems,
+      primaryAxisSizing: n.primaryAxisSizingMode,
+      counterAxisSizing: n.counterAxisSizingMode,
+      ...(n.layoutWrap !== "NO_WRAP" ? { wrap: n.layoutWrap } : {}),
+      ...(n.counterAxisSpacing !== null
+        ? { counterAxisSpacing: n.counterAxisSpacing }
+        : {}),
     };
   }
+
+  // Padding (only when non-zero)
+  if ("paddingLeft" in node) {
+    const n = node as AutoLayoutMixin;
+    if (n.paddingTop || n.paddingRight || n.paddingBottom || n.paddingLeft) {
+      styles.padding = {
+        top: n.paddingTop,
+        right: n.paddingRight,
+        bottom: n.paddingBottom,
+        left: n.paddingLeft,
+      };
+    }
+  }
+
+  // Clipping
+  if ("clipsContent" in node) {
+    styles.clipsContent = (node as BaseFrameMixin).clipsContent;
+  }
+
+  // Rotation
+  if ("rotation" in node && (node as DimensionAndPositionMixin).rotation !== 0) {
+    styles.rotation = (node as DimensionAndPositionMixin).rotation;
+  }
+
+  // Constraints
+  if ("constraints" in node) {
+    const c = (node as ConstraintMixin).constraints;
+    styles.constraints = { horizontal: c.horizontal, vertical: c.vertical };
+  }
+
   return styles;
 };
 
