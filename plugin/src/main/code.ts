@@ -28,11 +28,24 @@ type PluginResponse = {
   error?: string;
 };
 
+const getFileKey = (): string => {
+  // figma.fileKey is available for saved files; fall back to root name
+  try {
+    if (typeof figma.fileKey === "string" && figma.fileKey) {
+      return figma.fileKey;
+    }
+  } catch {
+    // fileKey may not be available in all contexts
+  }
+  return figma.root.name;
+};
+
 const sendStatus = () => {
   figma.ui.postMessage({
     type: "plugin-status",
     payload: {
       fileName: figma.root.name,
+      fileKey: getFileKey(),
       selectionCount: figma.currentPage.selection.length,
     },
   });
@@ -112,6 +125,9 @@ const handleRequest = async (
               name: style.name,
               fontSize: style.fontSize,
               fontName: style.fontName,
+              textDecoration: style.textDecoration,
+              lineHeight: style.lineHeight,
+              letterSpacing: style.letterSpacing,
             })),
             effects: effectStyles.map((style) => ({
               id: style.id,
