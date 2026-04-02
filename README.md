@@ -4,6 +4,8 @@
 
 - [Demo](#demo)
 - [Quick Start](#quick-start)
+- [Available Tools](#available-tools)
+- [Style Data](#style-data)
 - [Local development](#local-development)
 - [Structure](#structure)
 - [How it works](#how-it-works)
@@ -19,6 +21,8 @@ While other amazing Figma MCP servers like [Figma-Context-MCP](https://github.co
 The limit for free accounts is 6 requests per month, yes **per month**.
 
 Figma MCP Bridge is a solution to this problem. It is a plugin + MCP server that streams live Figma document data to AI tools without hitting Figma API rate limits, so its Figma MCP for the rest of us ✊
+
+It supports multiple Figma files connected simultaneously and exposes rich style data (fills, strokes, effects, auto-layout, typography, variables) for accurate design-to-code translation.
 
 ## Demo
 
@@ -53,6 +57,35 @@ Download the plugin from the [latest release](https://github.com/gethopp/figma-m
 Open a Figma file, run the plugin, and start prompting your AI tool. The MCP server will automatically connect to the plugin.
 
 If you want to know more about how it works, read the [How it works](#how-it-works) section.
+
+## Available Tools
+
+| Tool | Description |
+|------|-------------|
+| `list_files` | List all connected Figma files (supports multi-file) |
+| `get_document` | Get the full page document tree |
+| `get_selection` | Get currently selected nodes |
+| `get_node` | Get a specific node by ID |
+| `get_styles` | Get all local paint, text, effect, and grid styles |
+| `get_metadata` | Get file name, pages, and current page info |
+| `get_design_context` | Get a depth-limited tree optimized for design context |
+| `get_variable_defs` | Get all variable collections, modes, and values (design tokens) |
+| `get_screenshot` | Export nodes as PNG/SVG/JPG/PDF (base64) |
+| `save_screenshots` | Export and save screenshots directly to disk |
+
+All tools accept an optional `fileKey` parameter when multiple Figma files are connected simultaneously.
+
+## Style Data
+
+The bridge serializes comprehensive style data for each node:
+
+- **Fills & strokes** -- solid colors, linear/radial/angular/diamond gradients, image fills, stroke weight, alignment, dash patterns
+- **Effects** -- drop shadows, inner shadows, layer/background blur with offset, radius, spread, and color
+- **Corner radius** -- uniform and per-corner radii, corner smoothing (iOS-style superellipse)
+- **Auto-layout** -- direction, gap, alignment, sizing mode, wrap, counter-axis spacing
+- **Typography** -- font family, weight, style, size, line height, letter spacing, decoration, alignment, auto-resize
+- **Layout** -- opacity, blend mode, visibility, rotation, constraints, clipping, padding
+- **Variables** -- full variable collections with modes and resolved values (design tokens)
 
 ## Local development
 
