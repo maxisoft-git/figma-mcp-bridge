@@ -1,5 +1,5 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
-import hoppLogo from "./assets/hopp-logo.png";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import JSZip from "jszip";
 
 type RequestType =
   | "get_document"
@@ -78,6 +78,64 @@ export default function App() {
     };
   }, []);
 
+  const [exporting, setExporting] = useState(false);
+
+  const handleExport = useCallback(() => {
+    if (status.selectionCount === 0 || exporting) return;
+    setExporting(true);
+    parent.postMessage({ pluginMessage: { type: "export-selection" } }, "*");
+  }, [status.selectionCount, exporting]);
+
+  // Handle export result from plugin code
+  useEffect(() => {
+    const handleExportResult = async (event: MessageEvent) => {
+      const msg = event.data?.pluginMessage;
+      if (!msg || msg.type !== "export-result") return;
+
+      if (msg.error) {
+        console.error("Export failed:", msg.error);
+        setExporting(false);
+        return;
+      }
+
+      try {
+        const zip = new JSZip();
+        const seen = new Map<string, number>();
+
+        for (const item of msg.data) {
+          // Deduplicate names
+          let safeName = item.name.replace(/[\/\\:*?"<>|]/g, "_");
+          const count = seen.get(safeName) || 0;
+          seen.set(safeName, count + 1);
+          if (count > 0) safeName = `${safeName}_${count}`;
+
+          zip.file(`${safeName}.json`, JSON.stringify(item.json, null, 2));
+
+          // Decode base64 PNG
+          const raw = atob(item.pngBase64);
+          const bytes = new Uint8Array(raw.length);
+          for (let i = 0; i < raw.length; i++) bytes[i] = raw.charCodeAt(i);
+          zip.file(`${safeName}.png`, bytes);
+        }
+
+        const blob = await zip.generateAsync({ type: "blob" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `figma-export-${msg.data.length}-nodes.zip`;
+        a.click();
+        URL.revokeObjectURL(url);
+      } catch (err) {
+        console.error("ZIP creation failed:", err);
+      }
+
+      setExporting(false);
+    };
+
+    window.addEventListener("message", handleExportResult);
+    return () => window.removeEventListener("message", handleExportResult);
+  }, []);
+
   // Connect/reconnect WebSocket when fileKey changes
   useEffect(() => {
     if (!status.fileKey) return;
@@ -145,26 +203,19 @@ export default function App() {
         </div>
       </div>
 
+      <button
+        className="export-btn"
+        onClick={handleExport}
+        disabled={status.selectionCount === 0 || exporting}
+      >
+        {exporting ? "Exporting…" : `Export Selection to JSON`}
+      </button>
+
       <div className="footer">
         <div className={`badge ${connected ? "connected" : "disconnected"}`}>
           <span className="dot" />
           <span className="badge-text">{statusLabel}</span>
         </div>
-        <a
-          href="https://www.gethopp.app/?ref=figma-mcp-bridge"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="branding"
-        >
-          <img src={hoppLogo} alt="Hopp" className="logo" />
-          <span className="sponsored-text">
-            Sponsored by Hopp
-            <br />
-            The best open-source
-            <br />
-            pair-programming app
-          </span>
-        </a>
       </div>
     </div>
   );

@@ -1,10 +1,8 @@
 # Figma MCP Bridge
 
-[![Pairing with Hopp](https://gethopp.app/git/hopp-shield.svg?ref=hopp-repo)](https://gethopp.app)
-
-- [Demo](#demo)
 - [Quick Start](#quick-start)
 - [Available Tools](#available-tools)
+- [Export Selection](#export-selection)
 - [Style Data](#style-data)
 - [Local development](#local-development)
 - [Structure](#structure)
@@ -12,51 +10,32 @@
 
 <br/>
 
-<img src="https://raw.githubusercontent.com/gethopp/figma-mcp-bridge/main/logo.png" alt="Figma MCP Bridge" align="center" />
+A Figma plugin + MCP server that streams live Figma document data to AI tools without hitting Figma API rate limits. Supports multiple Figma files connected simultaneously and exposes rich style data (fills, strokes, effects, auto-layout, typography, variables) for accurate design-to-code translation.
 
-<br/>
-
-While other amazing Figma MCP servers like [Figma-Context-MCP](https://github.com/GLips/Figma-Context-MCP/) exist, one issues is the [API limiting](https://github.com/GLips/Figma-Context-MCP/issues/258) for free users.
-
-The limit for free accounts is 6 requests per month, yes **per month**.
-
-Figma MCP Bridge is a solution to this problem. It is a plugin + MCP server that streams live Figma document data to AI tools without hitting Figma API rate limits, so its Figma MCP for the rest of us ✊
-
-It supports multiple Figma files connected simultaneously and exposes rich style data (fills, strokes, effects, auto-layout, typography, variables) for accurate design-to-code translation.
-
-## Demo
-
-[Watch a demo of building a UI in Cursor with Figma MCP Bridge](https://youtu.be/ouygIhFBx0g)
-
-[![Watch the video](https://img.youtube.com/vi/ouygIhFBx0g/maxresdefault.jpg)](https://youtu.be/ouygIhFBx0g)
-
+Forked from [gethopp/figma-mcp-bridge](https://github.com/gethopp/figma-mcp-bridge).
 
 ## Quick Start
 
-### 1. Add the MCP server to your favourite AI tool
+### 1. Add the MCP server to your AI tool
 
-Add the following to your AI tool's MCP configuration (e.g. Cursor, Windsurf, Claude Desktop):
+Add the following to your AI tool's MCP configuration (e.g. Cursor, Windsurf, Claude Desktop, Claude Code):
 
 ```json
 {
   "figma-bridge": {
-    "command": "npx",
-    "args": ["-y", "@gethopp/figma-mcp-bridge"]
+    "command": "node",
+    "args": ["/path/to/figma-mcp-bridge/server/dist/index.js"]
   }
 }
 ```
 
-That's it — no binaries to download or install.
-
 ### 2. Add the Figma plugin
 
-Download the plugin from the [latest release](https://github.com/gethopp/figma-mcp-bridge/releases) page, then in Figma go to `Plugins > Development > Import plugin from manifest` and select the `manifest.json` file from the `plugin/` folder.
+In Figma go to `Plugins > Development > Import plugin from manifest` and select the `manifest.json` file from the `plugin/` folder.
 
-### 3. Start using it 🎉
+### 3. Start using it
 
 Open a Figma file, run the plugin, and start prompting your AI tool. The MCP server will automatically connect to the plugin.
-
-If you want to know more about how it works, read the [How it works](#how-it-works) section.
 
 ## Available Tools
 
@@ -75,41 +54,42 @@ If you want to know more about how it works, read the [How it works](#how-it-wor
 
 All tools accept an optional `fileKey` parameter when multiple Figma files are connected simultaneously.
 
+## Export Selection
+
+The plugin has an **Export Selection to JSON** button that packages every selected node into a ZIP file containing:
+
+- `{NodeName}.json` — full serialized design tree (bounds, fills, effects, auto-layout, typography, etc.)
+- `{NodeName}.png` — 2x raster screenshot
+
+Select frames in Figma, click the button, and get a ZIP download. Useful for extracting reference data without going through the MCP server.
+
 ## Style Data
 
 The bridge serializes comprehensive style data for each node:
 
-- **Fills & strokes** -- solid colors, linear/radial/angular/diamond gradients, image fills, stroke weight, alignment, dash patterns
-- **Effects** -- drop shadows, inner shadows, layer/background blur with offset, radius, spread, and color
-- **Corner radius** -- uniform and per-corner radii, corner smoothing (iOS-style superellipse)
-- **Auto-layout** -- direction, gap, alignment, sizing mode, wrap, counter-axis spacing
-- **Typography** -- font family, weight, style, size, line height, letter spacing, decoration, alignment, auto-resize
-- **Layout** -- opacity, blend mode, visibility, rotation, constraints, clipping, padding
-- **Variables** -- full variable collections with modes and resolved values (design tokens)
+- **Fills & strokes** — solid colors, linear/radial/angular/diamond gradients, image fills, stroke weight, alignment, dash patterns
+- **Effects** — drop shadows, inner shadows, layer/background blur with offset, radius, spread, and color
+- **Corner radius** — uniform and per-corner radii, corner smoothing (iOS-style superellipse)
+- **Auto-layout** — direction, gap, alignment, sizing mode, wrap, counter-axis spacing
+- **Typography** — font family, weight, style, size, line height, letter spacing, decoration, alignment, auto-resize
+- **Layout** — opacity, blend mode, visibility, rotation, constraints, clipping, padding
+- **Variables** — full variable collections with modes and resolved values (design tokens)
 
 ## Local development
 
-#### 1. Clone this repository locally
-
-```bash
-git clone git@github.com:gethopp/figma-mcp-bridge.git
-```
-
-#### 2. Build the server
+#### 1. Build the server
 
 ```bash
 cd server && npm install && npm run build
 ```
 
-#### 3. Build the plugin
+#### 2. Build the plugin
 
 ```bash
 cd plugin && bun install && bun run build
 ```
 
-#### 4. Add the MCP server to your favourite AI tool
-
-For local development, add the following to your AI tool's MCP config:
+#### 3. Add the MCP server to your AI tool
 
 ```json
 {
@@ -123,7 +103,7 @@ For local development, add the following to your AI tool's MCP config:
 ## Structure
 
 ```
-Figma-MCP-Bridge/
+figma-mcp-bridge/
 ├── plugin/   # Figma plugin (TypeScript/React)
 └── server/   # MCP server (TypeScript/Node.js)
     └── src/
@@ -139,20 +119,15 @@ Figma-MCP-Bridge/
 
 ## How it works
 
-There are two main components to the Figma MCP Bridge:
+Two main components:
 
 ### 1. The Figma Plugin
 
-The Figma plugin is the user interface for the Figma MCP Bridge. You run this inside the Figma file you want to use the MCP server for, and its responsible for getting you all the information you need.
+Runs inside Figma, connects to the local MCP server via WebSocket, and streams document data on demand. Also provides a direct **Export Selection** button for offline use.
 
 ### 2. The MCP Server
 
-The MCP server is the core of the Figma MCP Bridge. As the Figma plugin connects with the MCP server via a WebSocket connection, the MCP server is responsible for:
-- Handling WebSocket connections from the Figma plugin
-- Forwarding tool calls to the Figma plugin
-- Routing responses back to the Figma plugin
-- Handling leader election (as we can have only one WS connection to an MCP server at a time)
-
+Handles WebSocket connections from the plugin and exposes MCP tools to AI clients. Supports leader/follower election so multiple AI tools can connect simultaneously.
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
@@ -178,24 +153,16 @@ The MCP server is the core of the Figma MCP Bridge. As the Figma plugin connects
 └─────────────────────────────────────────────────────────────────────────────┘
                            ▲                              ▲
                            │ HTTP /rpc                    │ HTTP /rpc
-                           │ POST requests                │ POST requests
                            │                              │
          ┌─────────────────┴───────────┐    ┌─────────────┴───────────────┐
          │    FOLLOWER MCP SERVER 1    │    │    FOLLOWER MCP SERVER 2    │
-         │                             │    │                             │
-         │  • Pings leader /ping       │    │  • Pings leader /ping       │
-         │  • Forwards tool calls      │    │  • Forwards tool calls      │
-         │    via HTTP /rpc            │    │    via HTTP /rpc            │
-         │  • If leader dies →         │    │  • If leader dies →         │
-         │    attempts takeover        │    │    attempts takeover        │
+         │  • Proxies tool calls       │    │  • Proxies tool calls       │
+         │  • Takes over if leader dies│    │  • Takes over if leader dies│
          └─────────────────────────────┘    └─────────────────────────────┘
                     ▲                                      ▲
-                    │                                      │
-                    │ MCP Protocol                         │ MCP Protocol
-                    │ (stdio)                              │ (stdio)
+                    │ MCP Protocol (stdio)                  │ MCP Protocol (stdio)
                     ▼                                      ▼
          ┌─────────────────────────────┐    ┌─────────────────────────────┐
          │      AI Tool / IDE 1        │    │      AI Tool / IDE 2        │
-         │      (e.g., Cursor)         │    │      (e.g., Cursor)         │
          └─────────────────────────────┘    └─────────────────────────────┘
 ```

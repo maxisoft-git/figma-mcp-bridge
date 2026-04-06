@@ -339,7 +339,7 @@ const handleRequest = async (
   }
 };
 
-figma.showUI(__html__, { width: 320, height: 180 });
+figma.showUI(__html__, { width: 320, height: 220 });
 sendStatus();
 
 figma.on("selectionchange", () => {
@@ -349,6 +349,39 @@ figma.on("selectionchange", () => {
 figma.ui.onmessage = async (message) => {
   if (message.type === "ui-ready") {
     sendStatus();
+    return;
+  }
+
+  if (message.type === "export-selection") {
+    const selection = figma.currentPage.selection;
+    if (selection.length === 0) {
+      figma.ui.postMessage({ type: "export-result", error: "Nothing selected" });
+      return;
+    }
+
+    try {
+      const items = await Promise.all(
+        selection.map(async (node) => {
+          const json = serializeNode(node);
+          const pngBytes = await node.exportAsync({
+            format: "PNG",
+            constraint: { type: "SCALE", value: 2 },
+          });
+          return {
+            name: node.name,
+            id: node.id,
+            json,
+            pngBase64: figma.base64Encode(pngBytes),
+          };
+        })
+      );
+      figma.ui.postMessage({ type: "export-result", data: items });
+    } catch (err) {
+      figma.ui.postMessage({
+        type: "export-result",
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
     return;
   }
 
