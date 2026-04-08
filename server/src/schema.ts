@@ -64,6 +64,24 @@ export const toolInputSchemas = {
     fileKey: fileKeyField,
   }),
 
+  save_node_json: z.object({
+    items: z
+      .array(
+        z.object({
+          nodeId: figmaNodeId.describe("The node ID to serialize"),
+          outputPath: z
+            .string()
+            .min(1)
+            .describe(
+              "Output .json file path (relative paths resolve from the MCP server current working directory)",
+            ),
+        }),
+      )
+      .min(1)
+      .describe("List of nodes to serialize and save as JSON files"),
+    fileKey: fileKeyField,
+  }),
+
   set_node_visibility: z.object({
     items: z
       .array(
@@ -129,6 +147,7 @@ const rpcToArgs: Record<
   get_design_context: (_nodeIds, params) => ({ ...params }),
   get_variable_defs: (_nodeIds, params) => ({ ...params }),
   get_screenshot: (nodeIds, params) => ({ nodeIds, ...params }),
+  save_node_json: (_nodeIds, params) => ({ ...params }),
   set_node_visibility: (_nodeIds, params) => ({ ...params }),
   save_screenshots: (_nodeIds, params) => ({ ...params }),
 };

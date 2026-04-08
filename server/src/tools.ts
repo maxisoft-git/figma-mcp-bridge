@@ -163,6 +163,42 @@ export function registerTools(server: McpServer, node: Node, port: number): void
   );
 
   server.tool(
+    "save_node_json",
+    "Serialize one or more Figma nodes to JSON files on disk. Returns only file metadata (path, size, node name) — never dumps the JSON into the response. Use this instead of get_node when you want to inspect large nodes without filling the context window.",
+    toolInputSchemas.save_node_json.shape,
+    async ({ items, fileKey }): Promise<ToolResult> => {
+      const results = [];
+      for (const item of items) {
+        let resolvedPath = item.outputPath;
+        try {
+          resolvedPath = resolveAndValidateOutputPath(item.outputPath, process.cwd());
+          const resp = await node.send("get_node", [item.nodeId], fileKey);
+          if (resp.error) throw new Error(resp.error);
+          const json = JSON.stringify(resp.data, null, 2);
+          const bytes = Buffer.from(json, "utf8");
+          await mkdir(path.dirname(resolvedPath), { recursive: true });
+          try {
+            await writeFile(resolvedPath, bytes, { flag: "wx" });
+          } catch (err) {
+            if (isNodeError(err) && err.code === "EEXIST") {
+              throw new Error(`File already exists: ${resolvedPath}`);
+            }
+            throw err;
+          }
+          const nodeName = (resp.data as { name?: string })?.name;
+          results.push({ nodeId: item.nodeId, nodeName, outputPath: resolvedPath, bytesWritten: bytes.length, success: true });
+        } catch (err) {
+          results.push({ nodeId: item.nodeId, outputPath: resolvedPath, success: false, error: err instanceof Error ? err.message : String(err) });
+        }
+      }
+      const succeeded = results.filter((r) => r.success).length;
+      return {
+        content: [{ type: "text", text: JSON.stringify({ total: results.length, succeeded, failed: results.length - succeeded, results }) }],
+      };
+    }
+  );
+
+  server.tool(
     "set_node_visibility",
     "Show or hide specific Figma nodes. Returns previous visibility for each node so you can restore them after. Useful for isolating a single layer before exporting: hide all siblings, export the frame, then restore visibility.",
     toolInputSchemas.set_node_visibility.shape,
