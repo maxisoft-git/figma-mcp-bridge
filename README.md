@@ -57,6 +57,7 @@ Open a Figma file, run the plugin, and start prompting your AI tool. The MCP ser
 | `create_frame` | Create a new frame, optionally under a parent |
 | `create_text` | Create a new text node |
 | `create_shape` | Create a rectangle, ellipse, or line |
+| `create_image` | Create an image-backed rectangle from a local path, URL, or data URI |
 | `duplicate_nodes` | Duplicate nodes in place |
 | `reparent_nodes` | Move nodes into another parent |
 | `delete_nodes` | Delete nodes with explicit confirmation |
@@ -71,6 +72,7 @@ All tools accept an optional `fileKey` parameter when multiple Figma files are c
 - `delete_nodes` is intentionally gated behind `confirm: true`.
 - Text edits automatically load the fonts currently used by the target text node before applying the new content.
 - New text nodes default to `Inter Regular` unless a font is provided.
+- `create_image` reads local paths relative to the MCP server working directory unless you pass an absolute path.
 
 ### What You Can Build
 
@@ -79,11 +81,12 @@ With the current write surface, an agent can build a basic slide deck in a new e
 - Create slide frames
 - Create and style titles and body text
 - Create rectangles, ellipses, and lines for cards, separators, and simple diagrams
+- Place images from local files or remote URLs
 - Duplicate slide templates
 - Reparent content into the right frame or group structure
 - Adjust common geometry and visual properties after creation
 
-The current version is still intentionally limited. It does not yet cover image placement, components, variables/styles authoring, or advanced auto-layout editing.
+The current version is still intentionally limited. It does not yet cover components, variables/styles authoring, or advanced auto-layout editing.
 
 ## Export Selection
 
