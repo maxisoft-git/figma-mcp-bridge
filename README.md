@@ -106,6 +106,20 @@ The bridge serializes comprehensive style data for each node:
 - **Layout** — opacity, blend mode, visibility, rotation, constraints, clipping, padding
 - **Variables** — full variable collections with modes and resolved values (design tokens)
 
+## Available Tools
+
+| Tool | Description |
+|------|-------------|
+| `get_document` | Get the current Figma page document tree |
+| `get_selection` | Get the currently selected nodes in Figma |
+| `get_node` | Get a specific Figma node by ID (colon format, e.g. `4029:12345`) |
+| `get_styles` | Get all local paint, text, effect, and grid styles |
+| `get_metadata` | Get file name, pages, and current page info |
+| `get_design_context` | Get a depth-limited tree optimized for understanding design context |
+| `get_variable_defs` | Get all variable collections, modes, and values (design tokens) |
+| `get_screenshot` | Export nodes as PNG/SVG/JPG/PDF (base64-encoded) |
+| `save_screenshots` | Export and save screenshots directly to the local filesystem |
+
 ## Local development
 
 #### 1. Build the server
