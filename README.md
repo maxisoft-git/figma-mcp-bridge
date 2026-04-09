@@ -10,7 +10,7 @@
 
 <br/>
 
-A Figma plugin + MCP server that streams live Figma document data to AI tools without hitting Figma API rate limits. Supports multiple Figma files connected simultaneously and exposes rich style data (fills, strokes, effects, auto-layout, typography, variables) for accurate design-to-code translation.
+A Figma plugin + MCP server that streams live Figma document data to AI tools without hitting Figma API rate limits. Supports multiple Figma files connected simultaneously, exposes rich style data (fills, strokes, effects, auto-layout, typography, variables) for accurate design-to-code translation, and now includes a practical set of write tools for safe agent-driven edits and basic presentation authoring.
 
 Forked from [gethopp/figma-mcp-bridge](https://github.com/gethopp/figma-mcp-bridge).
 
@@ -50,9 +50,40 @@ Open a Figma file, run the plugin, and start prompting your AI tool. The MCP ser
 | `get_design_context` | Get a depth-limited tree optimized for design context |
 | `get_variable_defs` | Get all variable collections, modes, and values (design tokens) |
 | `get_screenshot` | Export nodes as PNG/SVG/JPG/PDF (base64) |
+| `set_node_visibility` | Show or hide specific nodes |
+| `set_text_content` | Replace the contents of a text node |
+| `set_text_properties` | Patch font, size, alignment, auto-resize, color, and bounds on a text node |
+| `set_node_properties` | Patch common node properties like name, position, size, visibility, opacity, radius, and solid fill |
+| `create_frame` | Create a new frame, optionally under a parent |
+| `create_text` | Create a new text node |
+| `create_shape` | Create a rectangle, ellipse, or line |
+| `duplicate_nodes` | Duplicate nodes in place |
+| `reparent_nodes` | Move nodes into another parent |
+| `delete_nodes` | Delete nodes with explicit confirmation |
 | `save_screenshots` | Export and save screenshots directly to disk |
 
 All tools accept an optional `fileKey` parameter when multiple Figma files are connected simultaneously.
+
+### Editing Notes
+
+- Edit tools work only while the Figma plugin is open and connected.
+- The current user must have permission to edit the target file.
+- `delete_nodes` is intentionally gated behind `confirm: true`.
+- Text edits automatically load the fonts currently used by the target text node before applying the new content.
+- New text nodes default to `Inter Regular` unless a font is provided.
+
+### What You Can Build
+
+With the current write surface, an agent can build a basic slide deck in a new empty Figma file:
+
+- Create slide frames
+- Create and style titles and body text
+- Create rectangles, ellipses, and lines for cards, separators, and simple diagrams
+- Duplicate slide templates
+- Reparent content into the right frame or group structure
+- Adjust common geometry and visual properties after creation
+
+The current version is still intentionally limited. It does not yet cover image placement, components, variables/styles authoring, or advanced auto-layout editing.
 
 ## Export Selection
 
