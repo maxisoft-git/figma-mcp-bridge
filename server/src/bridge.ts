@@ -49,6 +49,7 @@ export class Bridge {
     }
     this.connections.set(fileKey, { ws, fileKey, fileName });
     console.error(`Plugin connected: ${fileName} (${fileKey})`);
+    this.broadcastFiles();
 
     ws.on("message", (data) => {
       try {
@@ -69,6 +70,7 @@ export class Bridge {
       if (current?.ws === ws) {
         this.connections.delete(fileKey);
         console.error(`Plugin disconnected: ${fileName} (${fileKey})`);
+        this.broadcastFiles();
       }
     });
 
@@ -77,8 +79,22 @@ export class Bridge {
       const current = this.connections.get(fileKey);
       if (current?.ws === ws) {
         this.connections.delete(fileKey);
+        this.broadcastFiles();
       }
     });
+  }
+
+  private broadcastFiles(): void {
+    const payload = JSON.stringify({
+      type: "__bridge_event",
+      event: "files",
+      files: this.listConnectedFiles(),
+    });
+    for (const entry of this.connections.values()) {
+      if (entry.ws.readyState === WebSocket.OPEN) {
+        entry.ws.send(payload);
+      }
+    }
   }
 
   /**

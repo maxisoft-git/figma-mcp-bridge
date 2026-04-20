@@ -1,5 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import JSZip from "jszip";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 
 type RequestType =
   | "get_document"
@@ -29,13 +28,6 @@ type ServerRequest = {
   params?: Record<string, unknown>;
 };
 
-type PluginResponse = {
-  type: RequestType;
-  requestId: string;
-  data?: unknown;
-  error?: string;
-};
-
 type PluginStatus = {
   fileName: string;
   fileKey: string;
@@ -46,6 +38,7 @@ const WS_BASE_URL = "ws://localhost:1994/ws";
 
 export default function App() {
   const [connected, setConnected] = useState(false);
+  const [openFiles, setOpenFiles] = useState(0);
   const [status, setStatus] = useState<PluginStatus>({
     fileName: "Unknown file",
     fileKey: "",
@@ -85,65 +78,6 @@ export default function App() {
     };
   }, []);
 
-  const [exporting, setExporting] = useState(false);
-
-  const handleExport = useCallback(() => {
-    if (status.selectionCount === 0 || exporting) return;
-    setExporting(true);
-    parent.postMessage({ pluginMessage: { type: "export-selection" } }, "*");
-  }, [status.selectionCount, exporting]);
-
-  // Handle export result from plugin code
-  useEffect(() => {
-    const handleExportResult = async (event: MessageEvent) => {
-      const msg = event.data?.pluginMessage;
-      if (!msg || msg.type !== "export-result") return;
-
-      if (msg.error) {
-        console.error("Export failed:", msg.error);
-        setExporting(false);
-        return;
-      }
-
-      try {
-        const zip = new JSZip();
-        const seen = new Map<string, number>();
-
-        for (const item of msg.data) {
-          // Deduplicate names
-          let safeName = item.name.replace(/[\/\\:*?"<>|]/g, "_");
-          const count = seen.get(safeName) || 0;
-          seen.set(safeName, count + 1);
-          if (count > 0) safeName = `${safeName}_${count}`;
-
-          zip.file(`${safeName}.json`, JSON.stringify(item.json, null, 2));
-
-          // Decode base64 PNG
-          const raw = atob(item.pngBase64);
-          const bytes = new Uint8Array(raw.length);
-          for (let i = 0; i < raw.length; i++) bytes[i] = raw.charCodeAt(i);
-          zip.file(`${safeName}.png`, bytes);
-        }
-
-        const blob = await zip.generateAsync({ type: "blob" });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = `figma-export-${msg.data.length}-nodes.zip`;
-        a.click();
-        URL.revokeObjectURL(url);
-      } catch (err) {
-        console.error("ZIP creation failed:", err);
-      }
-
-      setExporting(false);
-    };
-
-    window.addEventListener("message", handleExportResult);
-    return () => window.removeEventListener("message", handleExportResult);
-  }, []);
-
-  // Connect/reconnect WebSocket when fileKey changes
   useEffect(() => {
     if (!status.fileKey) return;
 
@@ -163,6 +97,7 @@ export default function App() {
 
       ws.onclose = () => {
         setConnected(false);
+        setOpenFiles(0);
         if (reconnectTimer.current === null) {
           reconnectTimer.current = window.setTimeout(() => {
             reconnectTimer.current = null;
@@ -176,8 +111,17 @@ export default function App() {
       };
 
       ws.onmessage = (event) => {
-        const payload = JSON.parse(event.data) as ServerRequest;
-        parent.postMessage({ pluginMessage: { type: "server-request", payload } }, "*");
+        const parsed = JSON.parse(event.data);
+        if (parsed?.type === "__bridge_event") {
+          if (parsed.event === "files" && Array.isArray(parsed.files)) {
+            setOpenFiles(parsed.files.length);
+          }
+          return;
+        }
+        parent.postMessage(
+          { pluginMessage: { type: "server-request", payload: parsed as ServerRequest } },
+          "*"
+        );
       };
     };
 
@@ -195,28 +139,21 @@ export default function App() {
     };
   }, [status.fileKey, status.fileName]);
 
-
-
   return (
     <div className="container">
       <div className="info-section">
         <div className="info-row">
           <span className="info-label">File:</span>
-          <span className="info-value">{status.fileName}</span>
+          <span className="info-value">
+            {status.fileName}
+            {openFiles > 1 && <span className="info-muted"> · {openFiles} open</span>}
+          </span>
         </div>
         <div className="info-row">
           <span className="info-label">Selection:</span>
           <span className="info-value">{status.selectionCount} node(s)</span>
         </div>
       </div>
-
-      <button
-        className="export-btn"
-        onClick={handleExport}
-        disabled={status.selectionCount === 0 || exporting}
-      >
-        {exporting ? "Exporting…" : `Export Selection to JSON`}
-      </button>
 
       <div className="footer">
         <div className={`badge ${connected ? "connected" : "disconnected"}`}>
