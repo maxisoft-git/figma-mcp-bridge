@@ -4,7 +4,7 @@ import type { Duplex } from "node:stream";
 import type { BridgeRequest, BridgeResponse, ConnectedFile } from "./types.js";
 import { VERSION } from "./version.js";
 
-const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS ?? "https://figma.com,https://www.figma.com").split(",");
+const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS ?? "https://figma.com,https://www.figma.com,null").split(",");
 const BRIDGE_SECRET = process.env.BRIDGE_SECRET ?? "";
 
 interface PendingRequest {
