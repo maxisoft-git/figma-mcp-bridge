@@ -43,6 +43,7 @@ import { handle as create_component } from "./handlers/create_component";
 import { handle as create_instance } from "./handlers/create_instance";
 import { handle as set_instance_properties } from "./handlers/set_instance_properties";
 import { handle as batch_mutation } from "./handlers/batch_mutation";
+import { handle as get_image } from "./handlers/get_image";
 
 type Handler = (request: ServerRequest) => Promise<PluginResponse>;
 
@@ -90,6 +91,7 @@ const handlers: Record<RequestType, Handler> = {
   create_instance,
   set_instance_properties,
   batch_mutation,
+  get_image,
 };
 
 export const dispatch = async (

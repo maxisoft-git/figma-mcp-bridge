@@ -368,6 +368,8 @@ const serializeStyles = (node: SceneNode): SerializedStyles => {
 
 export type SerializeOptions = {
   includeHidden?: boolean;
+  depth?: number;
+  currentDepth?: number;
 };
 
 export const serializeNode = (
@@ -390,9 +392,23 @@ export const serializeNode = (
     const children = options?.includeHidden
       ? node.children
       : node.children.filter((child) => child.visible !== false);
+    const effectiveDepth = options?.depth ?? Infinity;
+    const nextDepth = (options?.currentDepth ?? 0) + 1;
+    if (nextDepth > effectiveDepth) {
+      return {
+        ...base,
+        children: undefined,
+        childCount: children.length,
+      };
+    }
     return {
       ...base,
-      children: children.map((child) => serializeNode(child, options)),
+      children: children.map((child) =>
+        serializeNode(child, {
+          ...options,
+          currentDepth: nextDepth,
+        })
+      ),
     };
   }
 

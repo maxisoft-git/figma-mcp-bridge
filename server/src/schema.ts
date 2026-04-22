@@ -252,6 +252,7 @@ export const toolInputSchemas = {
 
   get_selection: z.object({
     fileKey: fileKeyField,
+    includeHidden: z.boolean().optional().describe("Include hidden children in the tree (default false)"),
   }),
 
   get_node: z.object({
@@ -510,6 +511,18 @@ export const toolInputSchemas = {
     fileKey: fileKeyField,
   }),
 
+  get_image: z.object({
+    nodeId: figmaNodeId.describe("The node ID to export as image (colon-separated format)"),
+    format: exportFormat
+      .optional()
+      .describe("Export format: PNG (default) or SVG or JPG"),
+    scale: z
+      .number()
+      .optional()
+      .describe("Export scale for raster formats (default 1)"),
+    fileKey: fileKeyField,
+  }),
+
   batch_mutation: z.object({
     operations: z.array(z.object({
       type: z.string().describe("Operation type: create_frame, create_text, create_shape, set_position, set_size, set_fills, set_strokes, set_corner_radius, set_text_content, set_text_style, append_children, delete_node, find_nodes"),
@@ -563,6 +576,7 @@ const rpcToArgs: Record<
   create_instance: (_nodeIds, params) => ({ ...params }),
   set_instance_properties: (nodeIds, params) => ({ nodeId: nodeIds?.[0], ...params }),
   batch_mutation: (_nodeIds, params) => ({ ...params }),
+  get_image: (nodeIds, params) => ({ nodeId: nodeIds?.[0], ...params }),
 };
 
 /**

@@ -41,7 +41,8 @@ export type RequestType =
   | "create_component"
   | "create_instance"
   | "set_instance_properties"
-  | "batch_mutation";
+  | "batch_mutation"
+  | "get_image";
 
 export type ServerRequest = {
   type: RequestType;

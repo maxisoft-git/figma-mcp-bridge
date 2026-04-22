@@ -107,8 +107,12 @@ export function registerTools(server: McpServer, node: Node, port: number): void
     "get_selection",
     "Get the currently selected nodes in Figma. When multiple files are connected, specify fileKey.",
     toolInputSchemas.get_selection.shape,
-    async ({ fileKey }): Promise<ToolResult> => {
-      return renderResponse(() => node.send("get_selection", undefined, fileKey));
+    async ({ fileKey, includeHidden }): Promise<ToolResult> => {
+      const params: Record<string, unknown> = {};
+      if (includeHidden) params.includeHidden = true;
+      return renderResponse(() =>
+        node.sendWithParams("get_selection", undefined, params, fileKey)
+      );
     }
   );
 
@@ -180,6 +184,20 @@ export function registerTools(server: McpServer, node: Node, port: number): void
       if (scale !== undefined && scale > 0) params.scale = scale;
       return renderResponse(() =>
         node.sendWithParams("get_screenshot", nodeIds, params, fileKey)
+      );
+    }
+  );
+
+  server.tool(
+    "get_image",
+    "Export a specific node as an image. Unlike get_screenshot which renders the visual appearance, this exports the node directly using Figma's export. Returns base64-encoded image data. Use this when you need the actual image data for a specific node (e.g., a rectangle with an image fill). When multiple files are connected, specify fileKey.",
+    toolInputSchemas.get_image.shape,
+    async ({ nodeId, format, scale, fileKey }): Promise<ToolResult> => {
+      const params: Record<string, unknown> = {};
+      if (format) params.format = format;
+      if (scale !== undefined && scale > 0) params.scale = scale;
+      return renderResponse(() =>
+        node.sendWithParams("get_image", [nodeId], params, fileKey)
       );
     }
   );
