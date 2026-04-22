@@ -248,17 +248,20 @@ export const toolInputSchemas = {
   get_document: z.object({
     fileKey: fileKeyField,
     includeHidden: z.boolean().optional().describe("Include hidden nodes in the tree (default false)"),
+    includeImageData: z.boolean().optional().describe("Include actual image bytes for nodes with image fills (default false)"),
   }),
 
   get_selection: z.object({
     fileKey: fileKeyField,
     includeHidden: z.boolean().optional().describe("Include hidden children in the tree (default false)"),
+    includeImageData: z.boolean().optional().describe("Include actual image bytes for nodes with image fills (default false)"),
   }),
 
   get_node: z.object({
     nodeId: figmaNodeId.describe("The node ID to fetch"),
     fileKey: fileKeyField,
     includeHidden: z.boolean().optional().describe("Include hidden children in the tree (default false)"),
+    includeImageData: z.boolean().optional().describe("Include actual image bytes for nodes with image fills (default false)"),
   }),
 
   get_styles: z.object({
@@ -275,6 +278,7 @@ export const toolInputSchemas = {
       .optional()
       .describe("How many levels deep to traverse the node tree (default 2)"),
     includeHidden: z.boolean().optional().describe("Include hidden nodes (default false)"),
+    includeImageData: z.boolean().optional().describe("Include actual image bytes for nodes with image fills (default false)"),
     fileKey: fileKeyField,
   }),
 

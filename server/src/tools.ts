@@ -94,9 +94,10 @@ export function registerTools(server: McpServer, node: Node, port: number): void
     "get_document",
     "Get the current Figma page document tree. When multiple files are connected, specify fileKey.",
     toolInputSchemas.get_document.shape,
-    async ({ fileKey, includeHidden }): Promise<ToolResult> => {
+    async ({ fileKey, includeHidden, includeImageData }): Promise<ToolResult> => {
       const params: Record<string, unknown> = {};
       if (includeHidden) params.includeHidden = true;
+      if (includeImageData) params.includeImageData = true;
       return renderResponse(() =>
         node.sendWithParams("get_document", undefined, params, fileKey)
       );
@@ -107,9 +108,10 @@ export function registerTools(server: McpServer, node: Node, port: number): void
     "get_selection",
     "Get the currently selected nodes in Figma. When multiple files are connected, specify fileKey.",
     toolInputSchemas.get_selection.shape,
-    async ({ fileKey, includeHidden }): Promise<ToolResult> => {
+    async ({ fileKey, includeHidden, includeImageData }): Promise<ToolResult> => {
       const params: Record<string, unknown> = {};
       if (includeHidden) params.includeHidden = true;
+      if (includeImageData) params.includeImageData = true;
       return renderResponse(() =>
         node.sendWithParams("get_selection", undefined, params, fileKey)
       );
@@ -120,9 +122,10 @@ export function registerTools(server: McpServer, node: Node, port: number): void
     "get_node",
     "Get a specific Figma node by ID. Must use colon format, e.g. '4029:12345', never use hyphens. When multiple files are connected, specify fileKey.",
     toolInputSchemas.get_node.shape,
-    async ({ nodeId, fileKey, includeHidden }): Promise<ToolResult> => {
+    async ({ nodeId, fileKey, includeHidden, includeImageData }): Promise<ToolResult> => {
       const params: Record<string, unknown> = {};
       if (includeHidden) params.includeHidden = true;
+      if (includeImageData) params.includeImageData = true;
       return renderResponse(() =>
         node.sendWithParams("get_node", [nodeId], params, fileKey)
       );
@@ -151,13 +154,16 @@ export function registerTools(server: McpServer, node: Node, port: number): void
     "get_design_context",
     "Get the design context for the current selection or page. Returns a summarized tree structure optimized for understanding the current design context. When multiple files are connected, specify fileKey.",
     toolInputSchemas.get_design_context.shape,
-    async ({ depth, includeHidden, fileKey }): Promise<ToolResult> => {
+    async ({ depth, includeHidden, includeImageData, fileKey }): Promise<ToolResult> => {
       const params: Record<string, unknown> = {};
       if (depth !== undefined && depth > 0) {
         params.depth = depth;
       }
       if (includeHidden) {
         params.includeHidden = true;
+      }
+      if (includeImageData) {
+        params.includeImageData = true;
       }
       return renderResponse(() =>
         node.sendWithParams("get_design_context", undefined, params, fileKey)

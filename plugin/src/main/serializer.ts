@@ -22,6 +22,7 @@ type SerializedImagePaint = {
   imageHash?: string | null;
   imageTransform?: Transform;
   opacity?: number;
+  imageData?: string;
 };
 
 type SerializedPaint =
@@ -370,6 +371,7 @@ export type SerializeOptions = {
   includeHidden?: boolean;
   depth?: number;
   currentDepth?: number;
+  includeImageData?: boolean;
 };
 
 export const serializeNode = (
@@ -414,3 +416,87 @@ export const serializeNode = (
 
   return base;
 };
+
+function collectImageHashes(node: SerializedNode): string[] {
+  const hashes = new Set<string>();
+  const traverse = (n: SerializedNode) => {
+    if (n.styles?.fills) {
+      for (const fill of n.styles.fills) {
+        if (fill.type === "IMAGE" && fill.imageHash) {
+          hashes.add(fill.imageHash);
+        }
+      }
+    }
+    if (n.styles?.strokes) {
+      for (const stroke of n.styles.strokes) {
+        if (stroke.type === "IMAGE" && stroke.imageHash) {
+          hashes.add(stroke.imageHash);
+        }
+      }
+    }
+    if (n.children) {
+      for (const child of n.children) {
+        traverse(child);
+      }
+    }
+  };
+  traverse(node);
+  return [...hashes];
+}
+
+function enrichNodeWithImageData(
+  node: SerializedNode,
+  hashToData: Map<string, string>
+): void {
+  const applyToPaint = (paint: SerializedPaint) => {
+    if (paint.type === "IMAGE" && paint.imageHash) {
+      const data = hashToData.get(paint.imageHash);
+      if (data) {
+        paint.imageData = data;
+      }
+    }
+  };
+
+  if (node.styles?.fills) {
+    for (const fill of node.styles.fills) {
+      applyToPaint(fill);
+    }
+  }
+  if (node.styles?.strokes) {
+    for (const stroke of node.styles.strokes) {
+      applyToPaint(stroke);
+    }
+  }
+  if (node.children) {
+    for (const child of node.children) {
+      enrichNodeWithImageData(child, hashToData);
+    }
+  }
+}
+
+export async function enrichWithImageData(
+  node: SerializedNode
+): Promise<SerializedNode> {
+  const hashes = collectImageHashes(node);
+  if (hashes.length === 0) {
+    return node;
+  }
+
+  const hashToData = new Map<string, string>();
+  await Promise.all(
+    hashes.map(async (hash) => {
+      try {
+        const image = figma.getImageByHash(hash);
+        if (image) {
+          const bytes = await image.getBytesAsync();
+          hashToData.set(hash, figma.base64Encode(bytes));
+        }
+      } catch {
+        // image not available, skip
+      }
+    })
+  );
+
+  enrichNodeWithImageData(node, hashToData);
+  return node;
+}
