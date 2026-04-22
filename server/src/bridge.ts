@@ -4,6 +4,9 @@ import type { Duplex } from "node:stream";
 import type { BridgeRequest, BridgeResponse, ConnectedFile } from "./types.js";
 import { VERSION } from "./version.js";
 
+const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS ?? "https://figma.com,https://www.figma.com").split(",");
+const BRIDGE_SECRET = process.env.BRIDGE_SECRET ?? "";
+
 interface PendingRequest {
   resolve: (resp: BridgeResponse) => void;
   reject: (err: Error) => void;
@@ -27,12 +30,26 @@ export class Bridge {
   }
 
   handleUpgrade(request: IncomingMessage, socket: Duplex, head: Buffer): void {
+    const origin = request.headers.origin;
+    if (origin && !ALLOWED_ORIGINS.includes(origin)) {
+      console.error(`Connection rejected: unauthorized origin "${origin}"`);
+      socket.destroy();
+      return;
+    }
+
     const url = new URL(request.url ?? "", "http://localhost");
     const fileKey = url.searchParams.get("fileKey");
     const fileName = url.searchParams.get("fileName") ?? "Unknown";
+    const secret = url.searchParams.get("secret");
 
     if (!fileKey) {
       console.error("Plugin connected without fileKey, rejecting");
+      socket.destroy();
+      return;
+    }
+
+    if (BRIDGE_SECRET && secret !== BRIDGE_SECRET) {
+      console.error("Plugin connected with invalid secret, rejecting");
       socket.destroy();
       return;
     }
@@ -43,11 +60,14 @@ export class Bridge {
   }
 
   private handleConnection(ws: WebSocket, fileKey: string, fileName: string): void {
-    // Replace existing connection for the same file
+    // Protect existing live connection from being replaced
     const existing = this.connections.get(fileKey);
-    if (existing) {
-      existing.ws.close();
+    if (existing && existing.ws.readyState === WebSocket.OPEN) {
+      console.error(`Rejected duplicate connection for ${fileName} (${fileKey}): existing connection is alive`);
+      ws.close();
+      return;
     }
+
     this.connections.set(fileKey, { ws, fileKey, fileName });
     console.error(`Plugin connected: ${fileName} (${fileKey})`);
     this.broadcastFiles();

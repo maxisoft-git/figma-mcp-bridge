@@ -84,7 +84,8 @@ export default function App() {
         socketRef.current.close();
       }
 
-      const wsUrl = `${WS_BASE_URL}?fileKey=${encodeURIComponent(status.fileKey)}&fileName=${encodeURIComponent(status.fileName)}&pluginVersion=${encodeURIComponent(PLUGIN_VERSION)}`;
+      const secret = "figma-mcp-bridge-v1";
+      const wsUrl = `${WS_BASE_URL}?fileKey=${encodeURIComponent(status.fileKey)}&fileName=${encodeURIComponent(status.fileName)}&pluginVersion=${encodeURIComponent(PLUGIN_VERSION)}&secret=${encodeURIComponent(secret)}`;
       const ws = new WebSocket(wsUrl);
       socketRef.current = ws;
 
