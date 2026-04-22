@@ -40,7 +40,8 @@ export type RequestType =
   | "list_components"
   | "create_component"
   | "create_instance"
-  | "set_instance_properties";
+  | "set_instance_properties"
+  | "batch_mutation";
 
 export type ServerRequest = {
   type: RequestType;
