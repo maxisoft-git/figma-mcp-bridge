@@ -84,6 +84,8 @@ type SerializedStyles = {
   clipsContent?: boolean;
   rotation?: number;
   constraints?: { horizontal: string; vertical: string };
+  verticalTrim?: boolean;
+  horizontalTrim?: boolean;
 };
 
 type SerializedBounds = {
@@ -362,6 +364,18 @@ const serializeStyles = (node: SceneNode): SerializedStyles => {
   if ("constraints" in node) {
     const c = node.constraints as Constraints;
     styles.constraints = { horizontal: c.horizontal, vertical: c.vertical };
+  }
+  if ("verticalTrim" in node) {
+    const vt = node.verticalTrim as boolean;
+    if (vt) {
+      styles.verticalTrim = vt;
+    }
+  }
+  if ("horizontalTrim" in node) {
+    const ht = node.horizontalTrim as boolean;
+    if (ht) {
+      styles.horizontalTrim = ht;
+    }
   }
 
   return styles;

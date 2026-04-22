@@ -70,6 +70,22 @@ export async function handle(request: ServerRequest): Promise<PluginResponse> {
     applied.cornerRadius = node.cornerRadius;
   }
 
+  if (typeof params.verticalTrim === "boolean") {
+    if (!("verticalTrim" in node)) {
+      throw new Error(`Node does not support verticalTrim: ${node.id}`);
+    }
+    node.verticalTrim = params.verticalTrim;
+    applied.verticalTrim = node.verticalTrim;
+  }
+
+  if (typeof params.horizontalTrim === "boolean") {
+    if (!("horizontalTrim" in node)) {
+      throw new Error(`Node does not support horizontalTrim: ${node.id}`);
+    }
+    node.horizontalTrim = params.horizontalTrim;
+    applied.horizontalTrim = node.horizontalTrim;
+  }
+
   if (params.solidFillOpacity !== undefined && params.solidFillHex === undefined) {
     throw new Error("solidFillHex is required when solidFillOpacity is provided");
   }

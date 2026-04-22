@@ -41,6 +41,8 @@ export const setNodePropertiesInput = z.object({
     .min(0)
     .optional()
     .describe("Optional corner radius"),
+  verticalTrim: z.boolean().optional().describe("Optional vertical trim (trims content vertically)"),
+  horizontalTrim: z.boolean().optional().describe("Optional horizontal trim (trims content horizontally)"),
   solidFillHex: hexColor
     .optional()
     .describe("Optional solid fill color as hex"),
