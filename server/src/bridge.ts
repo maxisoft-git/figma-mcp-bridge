@@ -2,6 +2,7 @@ import { WebSocketServer, WebSocket } from "ws";
 import type { IncomingMessage } from "node:http";
 import type { Duplex } from "node:stream";
 import type { BridgeRequest, BridgeResponse, ConnectedFile } from "./types.js";
+import { VERSION } from "./version.js";
 
 interface PendingRequest {
   resolve: (resp: BridgeResponse) => void;
@@ -50,6 +51,7 @@ export class Bridge {
     this.connections.set(fileKey, { ws, fileKey, fileName });
     console.error(`Plugin connected: ${fileName} (${fileKey})`);
     this.broadcastFiles();
+    this.sendServerVersion(ws);
 
     ws.on("message", (data) => {
       try {
@@ -94,6 +96,16 @@ export class Bridge {
       if (entry.ws.readyState === WebSocket.OPEN) {
         entry.ws.send(payload);
       }
+    }
+  }
+
+  private sendServerVersion(ws: WebSocket): void {
+    if (ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({
+        type: "__bridge_event",
+        event: "server_version",
+        serverVersion: VERSION,
+      }));
     }
   }
 

@@ -106,3 +106,73 @@ body {
   font-weight: 500;
 }
 
+.version-warning {
+  background: #f59e0b22;
+  border: 1px solid #f59e0b;
+  border-radius: 6px;
+  padding: 6px 8px;
+  font-size: 10px;
+  line-height: 14px;
+  color: #fbbf24;
+}
+
+.version-hint {
+  color: #f59e0b99;
+  font-size: 9px;
+}
+
+.version-label {
+  font-size: 10px;
+  color: var(--text-label);
+  opacity: 0.7;
+}
+
+.log-section {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  max-height: 60px;
+  overflow-y: auto;
+}
+
+.log-entry {
+  display: flex;
+  align-items: baseline;
+  font-size: 9px;
+  line-height: 13px;
+  gap: 6px;
+}
+
+.log-time {
+  color: var(--text-label);
+  opacity: 0.6;
+  flex-shrink: 0;
+  font-family: monospace;
+}
+
+.log-type {
+  color: var(--text-value);
+  opacity: 0.8;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lock-btn {
+  font-size: 9px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  border: 1px solid var(--badge-border);
+  background: var(--badge-bg);
+  color: var(--badge-text);
+  cursor: pointer;
+  font-weight: 500;
+  line-height: 14px;
+}
+
+.lock-btn.locked {
+  background: #f04438;
+  border-color: #f04438;
+  color: white;
+}
+

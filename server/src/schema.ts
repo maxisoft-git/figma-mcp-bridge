@@ -1,9 +1,9 @@
 import { z } from "zod";
 
-/** Figma node IDs use colon-separated format, e.g. "4029:12345". */
+/** Figma node IDs use colon-separated format, e.g. "4029:12345". Composite IDs for instances use semicolons, e.g. "4029:12345;4029:67890". */
 export const figmaNodeId = z
   .string()
-  .regex(/^\d+:\d+$/, "Node ID must use colon format, e.g. '4029:12345'");
+  .regex(/^\d+:\d+(;\d+:\d+)*$/, "Node ID must use colon format, e.g. '4029:12345', or composite format for instances, e.g. '4029:12345;4029:67890'");
 const exportFormat = z.enum(["PNG", "SVG", "JPG", "PDF"]);
 const hexColor = z
   .string()
@@ -247,6 +247,7 @@ export const createImageInput = z.object({
 export const toolInputSchemas = {
   get_document: z.object({
     fileKey: fileKeyField,
+    includeHidden: z.boolean().optional().describe("Include hidden nodes in the tree (default false)"),
   }),
 
   get_selection: z.object({
@@ -256,6 +257,7 @@ export const toolInputSchemas = {
   get_node: z.object({
     nodeId: figmaNodeId.describe("The node ID to fetch"),
     fileKey: fileKeyField,
+    includeHidden: z.boolean().optional().describe("Include hidden children in the tree (default false)"),
   }),
 
   get_styles: z.object({
@@ -271,6 +273,7 @@ export const toolInputSchemas = {
       .number()
       .optional()
       .describe("How many levels deep to traverse the node tree (default 2)"),
+    includeHidden: z.boolean().optional().describe("Include hidden nodes (default false)"),
     fileKey: fileKeyField,
   }),
 
@@ -427,6 +430,85 @@ export const toolInputSchemas = {
       .describe("Default export scale for raster formats (default 2)"),
     fileKey: fileKeyField,
   }),
+
+  set_stroke: z.object({
+    nodeId: figmaNodeId.describe("The node ID to update"),
+    strokeHex: hexColor.optional().describe("Stroke color as hex"),
+    strokeOpacity: z.number().min(0).max(1).optional().describe("Stroke opacity (default 1)"),
+    strokeWeight: z.number().positive().optional().describe("Stroke weight"),
+    strokeAlign: z.enum(["INSIDE", "OUTSIDE", "CENTER"]).optional().describe("Stroke alignment"),
+    dashPattern: z.array(z.number()).optional().describe("Dash pattern as array of numbers"),
+    fileKey: fileKeyField,
+  }),
+
+  set_effects: z.object({
+    nodeId: figmaNodeId.describe("The node ID to update"),
+    mode: z.enum(["append", "replace", "clear"]).optional().describe("How to apply effects: append (default), replace all, or clear all"),
+    effects: z.array(z.object({
+      type: z.enum(["DROP_SHADOW", "INNER_SHADOW", "LAYER_BLUR", "BACKGROUND_BLUR"]).describe("Effect type"),
+      color: hexColor.optional().describe("Color for shadow effects (hex)"),
+      opacity: z.number().min(0).max(1).optional().describe("Opacity for shadow effects (default 0.25)"),
+      offset: z.object({ x: z.number(), y: z.number() }).optional().describe("Shadow offset"),
+      radius: z.number().optional().describe("Blur radius or shadow blur radius"),
+      spread: z.number().optional().describe("Shadow spread"),
+      blendMode: z.string().optional().describe("Blend mode (default NORMAL)"),
+      visible: z.boolean().optional().describe("Whether effect is visible (default true)"),
+    })).optional().describe("Array of effects to apply"),
+    fileKey: fileKeyField,
+  }),
+
+  set_constraints: z.object({
+    nodeId: figmaNodeId.describe("The node ID to update"),
+    horizontal: z.enum(["MIN", "CENTER", "MAX", "STRETCH", "SCALE"]).optional().describe("Horizontal constraint"),
+    vertical: z.enum(["MIN", "CENTER", "MAX", "STRETCH", "SCALE"]).optional().describe("Vertical constraint"),
+    fileKey: fileKeyField,
+  }),
+
+  set_gradient_fill: z.object({
+    nodeId: figmaNodeId.describe("The node ID to update"),
+    gradientType: z.enum(["GRADIENT_LINEAR", "GRADIENT_RADIAL", "GRADIENT_ANGULAR", "GRADIENT_DIAMOND"]).describe("Gradient type"),
+    stops: z.array(z.object({
+      color: hexColor.describe("Stop color as hex"),
+      opacity: z.number().min(0).max(1).optional().describe("Stop opacity (default 1)"),
+      position: z.number().min(0).max(1).describe("Stop position 0-1"),
+    })).min(2).describe("Gradient stops (at least 2)"),
+    transform: z.array(z.array(z.number())).optional().describe("Gradient transform matrix"),
+    opacity: z.number().min(0).max(1).optional().describe("Overall gradient opacity"),
+    fileKey: fileKeyField,
+  }),
+
+  list_components: z.object({
+    pageId: figmaNodeId.optional().describe("Page ID to search (defaults to current page)"),
+    fileKey: fileKeyField,
+  }),
+
+  create_component: z.object({
+    nodeId: figmaNodeId.describe("The node to convert into a component"),
+    name: z.string().optional().describe("Component name"),
+    description: z.string().optional().describe("Component description"),
+    fileKey: fileKeyField,
+  }),
+
+  create_instance: z.object({
+    componentId: figmaNodeId.optional().describe("Component node ID"),
+    componentKey: z.string().optional().describe("Component key (for external components)"),
+    x: z.number().optional().describe("X position"),
+    y: z.number().optional().describe("Y position"),
+    name: z.string().optional().describe("Instance name"),
+    parentId: figmaNodeId.optional().describe("Parent to append the instance into"),
+    fileKey: fileKeyField,
+  }),
+
+  set_instance_properties: z.object({
+    nodeId: figmaNodeId.describe("The instance node ID to update"),
+    overrides: z.array(z.object({
+      targetNodeId: figmaNodeId.optional().describe("Node ID of the child to override"),
+      targetNodeName: z.string().optional().describe("Name of the child to override"),
+      field: z.enum(["characters", "fills", "opacity", "visible", "name"]).describe("Property to override"),
+      value: z.union([z.string(), z.number(), z.boolean()]).describe("New value for the property"),
+    })).min(1).describe("Array of overrides to apply"),
+    fileKey: fileKeyField,
+  }),
 } as const;
 
 type ToolName = keyof typeof toolInputSchemas;
@@ -461,6 +543,14 @@ const rpcToArgs: Record<
   reparent_nodes: (nodeIds, params) => ({ nodeIds, ...params }),
   delete_nodes: (nodeIds, params) => ({ nodeIds, ...params }),
   save_screenshots: (_nodeIds, params) => ({ ...params }),
+  set_stroke: (nodeIds, params) => ({ nodeId: nodeIds?.[0], ...params }),
+  set_effects: (nodeIds, params) => ({ nodeId: nodeIds?.[0], ...params }),
+  set_constraints: (nodeIds, params) => ({ nodeId: nodeIds?.[0], ...params }),
+  set_gradient_fill: (nodeIds, params) => ({ nodeId: nodeIds?.[0], ...params }),
+  list_components: (_nodeIds, params) => ({ ...params }),
+  create_component: (nodeIds, params) => ({ nodeId: nodeIds?.[0], ...params }),
+  create_instance: (_nodeIds, params) => ({ ...params }),
+  set_instance_properties: (nodeIds, params) => ({ nodeId: nodeIds?.[0], ...params }),
 };
 
 /**

@@ -94,8 +94,12 @@ export function registerTools(server: McpServer, node: Node, port: number): void
     "get_document",
     "Get the current Figma page document tree. When multiple files are connected, specify fileKey.",
     toolInputSchemas.get_document.shape,
-    async ({ fileKey }): Promise<ToolResult> => {
-      return renderResponse(() => node.send("get_document", undefined, fileKey));
+    async ({ fileKey, includeHidden }): Promise<ToolResult> => {
+      const params: Record<string, unknown> = {};
+      if (includeHidden) params.includeHidden = true;
+      return renderResponse(() =>
+        node.sendWithParams("get_document", undefined, params, fileKey)
+      );
     }
   );
 
@@ -112,8 +116,12 @@ export function registerTools(server: McpServer, node: Node, port: number): void
     "get_node",
     "Get a specific Figma node by ID. Must use colon format, e.g. '4029:12345', never use hyphens. When multiple files are connected, specify fileKey.",
     toolInputSchemas.get_node.shape,
-    async ({ nodeId, fileKey }): Promise<ToolResult> => {
-      return renderResponse(() => node.send("get_node", [nodeId], fileKey));
+    async ({ nodeId, fileKey, includeHidden }): Promise<ToolResult> => {
+      const params: Record<string, unknown> = {};
+      if (includeHidden) params.includeHidden = true;
+      return renderResponse(() =>
+        node.sendWithParams("get_node", [nodeId], params, fileKey)
+      );
     }
   );
 
@@ -139,10 +147,13 @@ export function registerTools(server: McpServer, node: Node, port: number): void
     "get_design_context",
     "Get the design context for the current selection or page. Returns a summarized tree structure optimized for understanding the current design context. When multiple files are connected, specify fileKey.",
     toolInputSchemas.get_design_context.shape,
-    async ({ depth, fileKey }): Promise<ToolResult> => {
+    async ({ depth, includeHidden, fileKey }): Promise<ToolResult> => {
       const params: Record<string, unknown> = {};
       if (depth !== undefined && depth > 0) {
         params.depth = depth;
+      }
+      if (includeHidden) {
+        params.includeHidden = true;
       }
       return renderResponse(() =>
         node.sendWithParams("get_design_context", undefined, params, fileKey)
@@ -374,6 +385,96 @@ export function registerTools(server: McpServer, node: Node, port: number): void
           isError: true,
         };
       }
+    }
+  );
+
+  server.tool(
+    "set_stroke",
+    "Set or update the stroke on a node. Supports color, weight, alignment, and dash patterns. When multiple files are connected, specify fileKey.",
+    toolInputSchemas.set_stroke.shape,
+    async ({ nodeId, fileKey, ...properties }): Promise<ToolResult> => {
+      return renderResponse(() =>
+        node.sendWithParams("set_stroke", [nodeId], properties, fileKey)
+      );
+    }
+  );
+
+  server.tool(
+    "set_effects",
+    "Add, replace, or clear visual effects (shadows, blurs) on a node. Use mode:'append' to add, mode:'replace' to replace all, or mode:'clear' to remove all. When multiple files are connected, specify fileKey.",
+    toolInputSchemas.set_effects.shape,
+    async ({ nodeId, fileKey, ...params }): Promise<ToolResult> => {
+      return renderResponse(() =>
+        node.sendWithParams("set_effects", [nodeId], params, fileKey)
+      );
+    }
+  );
+
+  server.tool(
+    "set_constraints",
+    "Set resizing constraints on a node (horizontal and vertical). When multiple files are connected, specify fileKey.",
+    toolInputSchemas.set_constraints.shape,
+    async ({ nodeId, fileKey, ...params }): Promise<ToolResult> => {
+      return renderResponse(() =>
+        node.sendWithParams("set_constraints", [nodeId], params, fileKey)
+      );
+    }
+  );
+
+  server.tool(
+    "set_gradient_fill",
+    "Add a gradient fill (linear, radial, angular, or diamond) to a node. When multiple files are connected, specify fileKey.",
+    toolInputSchemas.set_gradient_fill.shape,
+    async ({ nodeId, fileKey, ...params }): Promise<ToolResult> => {
+      return renderResponse(() =>
+        node.sendWithParams("set_gradient_fill", [nodeId], params, fileKey)
+      );
+    }
+  );
+
+  server.tool(
+    "list_components",
+    "List all local components on the current page or a specified page. Returns component ID, name, key, and dimensions. When multiple files are connected, specify fileKey.",
+    toolInputSchemas.list_components.shape,
+    async ({ pageId, fileKey }): Promise<ToolResult> => {
+      const params: Record<string, unknown> = {};
+      if (pageId) params.pageId = pageId;
+      return renderResponse(() =>
+        node.sendWithParams("list_components", undefined, params, fileKey)
+      );
+    }
+  );
+
+  server.tool(
+    "create_component",
+    "Convert an existing node into a reusable component. Returns the new component's ID and key. When multiple files are connected, specify fileKey.",
+    toolInputSchemas.create_component.shape,
+    async ({ nodeId, fileKey, ...params }): Promise<ToolResult> => {
+      return renderResponse(() =>
+        node.sendWithParams("create_component", [nodeId], params, fileKey)
+      );
+    }
+  );
+
+  server.tool(
+    "create_instance",
+    "Create an instance of an existing component by ID or key. Returns the new instance's ID. When multiple files are connected, specify fileKey.",
+    toolInputSchemas.create_instance.shape,
+    async ({ fileKey, ...params }): Promise<ToolResult> => {
+      return renderResponse(() =>
+        node.sendWithParams("create_instance", undefined, params, fileKey)
+      );
+    }
+  );
+
+  server.tool(
+    "set_instance_properties",
+    "Override properties on a component instance's children. Supports changing text content, fills, opacity, visibility, and name of nested nodes. When multiple files are connected, specify fileKey.",
+    toolInputSchemas.set_instance_properties.shape,
+    async ({ nodeId, fileKey, ...params }): Promise<ToolResult> => {
+      return renderResponse(() =>
+        node.sendWithParams("set_instance_properties", [nodeId], params, fileKey)
+      );
     }
   );
 }

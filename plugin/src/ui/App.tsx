@@ -1,44 +1,36 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 
-type RequestType =
-  | "get_document"
-  | "get_selection"
-  | "get_node"
-  | "get_styles"
-  | "get_metadata"
-  | "get_design_context"
-  | "get_variable_defs"
-  | "get_screenshot"
-  | "set_node_visibility"
-  | "set_text_content"
-  | "set_text_properties"
-  | "set_node_properties"
-  | "create_frame"
-  | "create_text"
-  | "create_shape"
-  | "create_image"
-  | "duplicate_nodes"
-  | "reparent_nodes"
-  | "delete_nodes";
-
-type ServerRequest = {
-  type: RequestType;
-  requestId: string;
-  nodeIds?: string[];
-  params?: Record<string, unknown>;
-};
+const PLUGIN_VERSION = "0.5.0";
 
 type PluginStatus = {
   fileName: string;
   fileKey: string;
   selectionCount: number;
+  pluginVersion?: string;
 };
 
 const WS_BASE_URL = "ws://localhost:1994/ws";
 
+type ServerRequest = {
+  type: string;
+  requestId: string;
+  nodeIds?: string[];
+  params?: Record<string, unknown>;
+};
+
+type LogEntry = {
+  type: string;
+  time: string;
+};
+
+const MAX_LOG = 5;
+
 export default function App() {
   const [connected, setConnected] = useState(false);
   const [openFiles, setOpenFiles] = useState(0);
+  const [serverVersion, setServerVersion] = useState<string | null>(null);
+  const [locked, setLocked] = useState(false);
+  const [log, setLog] = useState<LogEntry[]>([]);
   const [status, setStatus] = useState<PluginStatus>({
     fileName: "Unknown file",
     fileKey: "",
@@ -51,6 +43,12 @@ export default function App() {
     () => (connected ? "WebSocket Connected" : "Disconnected"),
     [connected]
   );
+
+  const addLog = (type: string) => {
+    const now = new Date();
+    const time = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}:${String(now.getSeconds()).padStart(2, "0")}`;
+    setLog((prev) => [{ type, time }, ...prev].slice(0, MAX_LOG));
+  };
 
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
@@ -86,7 +84,7 @@ export default function App() {
         socketRef.current.close();
       }
 
-      const wsUrl = `${WS_BASE_URL}?fileKey=${encodeURIComponent(status.fileKey)}&fileName=${encodeURIComponent(status.fileName)}`;
+      const wsUrl = `${WS_BASE_URL}?fileKey=${encodeURIComponent(status.fileKey)}&fileName=${encodeURIComponent(status.fileName)}&pluginVersion=${encodeURIComponent(PLUGIN_VERSION)}`;
       const ws = new WebSocket(wsUrl);
       socketRef.current = ws;
 
@@ -116,8 +114,23 @@ export default function App() {
           if (parsed.event === "files" && Array.isArray(parsed.files)) {
             setOpenFiles(parsed.files.length);
           }
+          if (parsed.event === "server_version" && typeof parsed.serverVersion === "string") {
+            setServerVersion(parsed.serverVersion);
+          }
           return;
         }
+        if (locked) {
+          const errorResp = {
+            type: parsed.type,
+            requestId: parsed.requestId,
+            error: "Plugin locked by user",
+          };
+          if (ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify(errorResp));
+          }
+          return;
+        }
+        addLog(parsed.type ?? "unknown");
         parent.postMessage(
           { pluginMessage: { type: "server-request", payload: parsed as ServerRequest } },
           "*"
@@ -137,7 +150,9 @@ export default function App() {
         socketRef.current = null;
       }
     };
-  }, [status.fileKey, status.fileName]);
+  }, [status.fileKey, status.fileName, locked]);
+
+  const versionMismatch = serverVersion && serverVersion !== PLUGIN_VERSION;
 
   return (
     <div className="container">
@@ -155,7 +170,34 @@ export default function App() {
         </div>
       </div>
 
+      {versionMismatch && (
+        <div className="version-warning">
+          Plugin v{PLUGIN_VERSION} ← Server v{serverVersion}
+          <br />
+          <span className="version-hint">Re-import plugin to update</span>
+        </div>
+      )}
+
+      {log.length > 0 && (
+        <div className="log-section">
+          {log.map((entry, i) => (
+            <div key={i} className="log-entry">
+              <span className="log-time">{entry.time}</span>
+              <span className="log-type">{entry.type}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
       <div className="footer">
+        <span className="version-label">v{PLUGIN_VERSION}</span>
+        <button
+          className={`lock-btn ${locked ? "locked" : ""}`}
+          onClick={() => setLocked((l) => !l)}
+          title={locked ? "Unlock plugin" : "Lock plugin"}
+        >
+          {locked ? "Locked" : "Lock"}
+        </button>
         <div className={`badge ${connected ? "connected" : "disconnected"}`}>
           <span className="dot" />
           <span className="badge-text">{statusLabel}</span>

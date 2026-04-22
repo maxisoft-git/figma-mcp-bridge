@@ -366,7 +366,14 @@ const serializeStyles = (node: SceneNode): SerializedStyles => {
   return styles;
 };
 
-export const serializeNode = (node: SceneNode): SerializedNode => {
+export type SerializeOptions = {
+  includeHidden?: boolean;
+};
+
+export const serializeNode = (
+  node: SceneNode,
+  options?: SerializeOptions
+): SerializedNode => {
   const base: SerializedNode = {
     id: node.id,
     name: node.name,
@@ -380,11 +387,12 @@ export const serializeNode = (node: SceneNode): SerializedNode => {
   }
 
   if ("children" in node) {
+    const children = options?.includeHidden
+      ? node.children
+      : node.children.filter((child) => child.visible !== false);
     return {
       ...base,
-      children: node.children
-        .filter((child) => child.visible !== false)
-        .map((child) => serializeNode(child)),
+      children: children.map((child) => serializeNode(child, options)),
     };
   }
 
