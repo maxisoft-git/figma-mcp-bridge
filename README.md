@@ -1,24 +1,14 @@
 # Figma MCP Bridge
 
-- [Quick Start](#quick-start)
-- [Available Tools](#available-tools)
-- [Export Selection](#export-selection)
-- [Style Data](#style-data)
-- [Local development](#local-development)
-- [Structure](#structure)
-- [How it works](#how-it-works)
+Figma плагин + MCP-сервер для передачи данных документа Figma в AI-инструменты без ограничений API Figma. Поддерживает подключение нескольких Figma-файлов одновременно, предоставляет богатые данные о стилях (заливки, обводки, эффекты, auto-layout, типографика, переменные) для точного перевода дизайна в код, а также набор инструментов записи для безопасного редактирования агентом.
 
-<br/>
+Форк [gethopp/figma-mcp-bridge](https://github.com/gethopp/figma-mcp-bridge).
 
-A Figma plugin + MCP server that streams live Figma document data to AI tools without hitting Figma API rate limits. Supports multiple Figma files connected simultaneously, exposes rich style data (fills, strokes, effects, auto-layout, typography, variables) for accurate design-to-code translation, and now includes a practical set of write tools for safe agent-driven edits and basic presentation authoring.
+## Быстрый старт
 
-Forked from [gethopp/figma-mcp-bridge](https://github.com/gethopp/figma-mcp-bridge).
+### 1. Подключите MCP-сервер к AI-инструменту
 
-## Quick Start
-
-### 1. Add the MCP server to your AI tool
-
-Add the following to your AI tool's MCP configuration (e.g. Cursor, Windsurf, Claude Desktop, Claude Code):
+Добавьте в конфигурацию MCP вашего AI-инструмента (Cursor, Windsurf, Claude Desktop, Claude Code):
 
 ```json
 {
@@ -29,153 +19,142 @@ Add the following to your AI tool's MCP configuration (e.g. Cursor, Windsurf, Cl
 }
 ```
 
-### 2. Add the Figma plugin
+### 2. Установите Figma плагин
 
-In Figma go to `Plugins > Development > Import plugin from manifest` and select the `manifest.json` file from the `plugin/` folder.
+В Figma: `Plugins > Development > Import plugin from manifest` — выберите `manifest.json` из папки `plugin/`.
 
-### 3. Start using it
+### 3. Начните работу
 
-Open a Figma file, run the plugin, and start prompting your AI tool. The MCP server will automatically connect to the plugin.
+Откройте Figma файл, запустите плагин и используйте AI-инструмент. MCP-сервер автоматически подключится к плагину.
 
-## Available Tools
+## Доступные инструменты
 
-| Tool | Description |
-|------|-------------|
-| `list_files` | List all connected Figma files (supports multi-file) |
-| `get_document` | Get the full page document tree |
-| `get_selection` | Get currently selected nodes |
-| `get_node` | Get a specific node by ID |
-| `get_styles` | Get all local paint, text, effect, and grid styles |
-| `get_metadata` | Get file name, pages, and current page info |
-| `get_design_context` | Get a depth-limited tree optimized for design context |
-| `get_variable_defs` | Get all variable collections, modes, and values (design tokens) |
-| `get_screenshot` | Export nodes as PNG/SVG/JPG/PDF (base64) |
-| `set_node_visibility` | Show or hide specific nodes |
-| `set_text_content` | Replace the contents of a text node |
-| `set_text_properties` | Patch font, size, alignment, auto-resize, color, and bounds on a text node |
-| `set_node_properties` | Patch common node properties like name, position, size, visibility, opacity, radius, and solid fill |
-| `create_frame` | Create a new frame, optionally under a parent |
-| `create_text` | Create a new text node |
-| `create_shape` | Create a rectangle, ellipse, or line |
-| `create_image` | Create an image-backed rectangle from a local path, URL, or data URI |
-| `duplicate_nodes` | Duplicate nodes in place |
-| `reparent_nodes` | Move nodes into another parent |
-| `delete_nodes` | Delete nodes with explicit confirmation |
-| `save_screenshots` | Export and save screenshots directly to disk |
+### Чтение
 
-All tools accept an optional `fileKey` parameter when multiple Figma files are connected simultaneously.
+| Инструмент | Описание |
+|---|---|
+| `list_files` | Список всех подключённых Figma файлов |
+| `get_document` | Дерево документа текущей страницы |
+| `get_selection` | Текущая выборка узлов |
+| `get_node` | Конкретный узел по ID (формат через двоеточие, например `4029:12345`) |
+| `get_styles` | Все локальные стили (paint, text, effect, grid) |
+| `get_metadata` | Имя файла, страницы, текущая страница |
+| `get_design_context` | Дерево с ограничением глубины для понимания контекста дизайна |
+| `get_variable_defs` | Все коллекции переменных, моды и значения (design tokens) |
+| `get_screenshot` | Экспорт узлов как PNG/SVG/JPG/PDF (base64) |
 
-### Editing Notes
+### Запись
 
-- Edit tools work only while the Figma plugin is open and connected.
-- The current user must have permission to edit the target file.
-- `delete_nodes` is intentionally gated behind `confirm: true`.
-- Text edits automatically load the fonts currently used by the target text node before applying the new content.
-- New text nodes default to `Inter Regular` unless a font is provided.
-- `create_image` reads local paths relative to the MCP server working directory unless you pass an absolute path.
+| Инструмент | Описание |
+|---|---|
+| `set_node_visibility` | Показать/скрыть узлы |
+| `set_text_content` | Изменить содержимое текстового узла |
+| `set_text_properties` | Изменить шрифт, размер, выравнивание, цвет текста |
+| `set_node_properties` | Изменить имя, позицию, размер, видимость, opacity, радиус, заливку |
+| `create_frame` | Создать фрейм |
+| `create_text` | Создать текстовый узел |
+| `create_shape` | Создать прямоугольник, эллипс или линию |
+| `create_image` | Создать изображение из файла, URL или data URI |
+| `duplicate_nodes` | Дублировать узлы |
+| `reparent_nodes` | Переместить узлы в другую родительскую группу |
+| `delete_nodes` | Удалить узлы (требует подтверждение) |
+| `set_stroke` | Изменить обводку (цвет, вес, выравнивание, dash-паттерн) |
+| `set_effects` | Добавить/заменить/очистить эффекты (тени, размытия) |
+| `set_constraints` | Установить constraints (горизонтальные и вертикальные) |
+| `set_gradient_fill` | Добавить градиентную заливку (линейный, радиальный, угловой, diamond) |
+| `create_component` | Конвертировать узел в компонент |
+| `create_instance` | Создать экземпляр компонента |
+| `set_instance_properties` | Переопределить свойства дочерних узлов в экземпляре |
+| `batch_mutation` | Выполнить несколько операций атомарно (создание, изменение, удаление) |
 
-### What You Can Build
+### Экспорт
 
-With the current write surface, an agent can build a basic slide deck in a new empty Figma file:
+| Инструмент | Описание |
+|---|---|
+| `save_node_json` | Сохранить узлы в JSON-файлы на диск |
+| `save_screenshots` | Экспортировать и сохранить скриншоты на диск |
 
-- Create slide frames
-- Create and style titles and body text
-- Create rectangles, ellipses, and lines for cards, separators, and simple diagrams
-- Place images from local files or remote URLs
-- Duplicate slide templates
-- Reparent content into the right frame or group structure
-- Adjust common geometry and visual properties after creation
+Все инструменты принимают опциональный параметр `fileKey` при подключении нескольких Figma файлов.
 
-The current version is still intentionally limited. It does not yet cover components, variables/styles authoring, or advanced auto-layout editing.
+## Примечания
 
-## Export Selection
+- Инструменты записи работают только при открытом и подключённом Figma плагине.
+- У пользователя должны быть права на редактирование целевого файла.
+- `delete_nodes` намеренно защищён параметром `confirm: true`.
+- Редактирование текста автоматически загружает шрифты целевого узла.
+- Новые текстовые узлы по умолчанию используют `Inter Regular`.
+- `create_image` читает локальные пути относительно рабочей директории MCP-сервера.
+- `batch_mutation` поддерживает до 100 операций за вызов. Операции выполняются последовательно; при ошибке выполнение останавливается. Можно создавать узлы и ссылаться на них по имени (`tmp:refName`) в последующих операциях того же вызова.
 
-The plugin has an **Export Selection to JSON** button that packages every selected node into a ZIP file containing:
+## Что можно построить
 
-- `{NodeName}.json` — full serialized design tree (bounds, fills, effects, auto-layout, typography, etc.)
-- `{NodeName}.png` — 2x raster screenshot
+С текущим набором инструментов агент может создавать слайды в новом Figma файле:
 
-Select frames in Figma, click the button, and get a ZIP download. Useful for extracting reference data without going through the MCP server.
+- Создавать фреймы для слайдов
+- Добавлять и стилизовать заголовки и текст
+- Создавать прямоугольники, эллипсы, линии
+- Добавлять изображения из файлов или URL
+- Дублировать шаблоны слайдов
+- Перемещать контент между группами
+- Изменять свойства геометрии и отображения
 
-## Style Data
+## Экспорт выборки
 
-The bridge serializes comprehensive style data for each node:
+Плагин имеет кнопку **Export Selection to JSON** — экспортирует выборку в ZIP с JSON (полное дерево дизайна) и PNG (2x скриншот).
 
-- **Fills & strokes** — solid colors, linear/radial/angular/diamond gradients, image fills, stroke weight, alignment, dash patterns
-- **Effects** — drop shadows, inner shadows, layer/background blur with offset, radius, spread, and color
-- **Corner radius** — uniform and per-corner radii, corner smoothing (iOS-style superellipse)
+## Данные о стилях
+
+Мост сериализует полные данные о стилях каждого узла:
+
+- **Заливки и обводки** — solid, linear/radial/angular/diamond градиенты, image fills, weight, alignment, dash patterns
+- **Эффекты** — drop shadows, inner shadows, layer/background blur
+- **Corner radius** — равномерный и per-corner, corner smoothing
 - **Auto-layout** — direction, gap, alignment, sizing mode, wrap, counter-axis spacing
-- **Typography** — font family, weight, style, size, line height, letter spacing, decoration, alignment, auto-resize
+- **Типографика** — font family, weight, style, size, line height, letter spacing, alignment, auto-resize
 - **Layout** — opacity, blend mode, visibility, rotation, constraints, clipping, padding
-- **Variables** — full variable collections with modes and resolved values (design tokens)
+- **Переменные** — коллекции с модами и resolved values (design tokens)
 
-## Available Tools
+## Локальная разработка
 
-| Tool | Description |
-|------|-------------|
-| `get_document` | Get the current Figma page document tree |
-| `get_selection` | Get the currently selected nodes in Figma |
-| `get_node` | Get a specific Figma node by ID (colon format, e.g. `4029:12345`) |
-| `get_styles` | Get all local paint, text, effect, and grid styles |
-| `get_metadata` | Get file name, pages, and current page info |
-| `get_design_context` | Get a depth-limited tree optimized for understanding design context |
-| `get_variable_defs` | Get all variable collections, modes, and values (design tokens) |
-| `get_screenshot` | Export nodes as PNG/SVG/JPG/PDF (base64-encoded) |
-| `save_screenshots` | Export and save screenshots directly to the local filesystem |
-
-## Local development
-
-#### 1. Build the server
+### Сервер
 
 ```bash
 cd server && npm install && npm run build
 ```
 
-#### 2. Build the plugin
+### Плагин
 
 ```bash
 cd plugin && bun install && bun run build
 ```
 
-#### 3. Add the MCP server to your AI tool
-
-```json
-{
-  "figma-bridge": {
-    "command": "node",
-    "args": ["/path/to/figma-mcp-bridge/server/dist/index.js"]
-  }
-}
-```
-
-## Structure
+## Структура
 
 ```
 figma-mcp-bridge/
-├── plugin/   # Figma plugin (TypeScript/React)
-└── server/   # MCP server (TypeScript/Node.js)
+├── plugin/   # Figma плагин (TypeScript/React)
+└── server/   # MCP сервер (TypeScript/Node.js)
     └── src/
-        ├── index.ts      # Entry point
-        ├── bridge.ts     # WebSocket bridge to Figma plugin
-        ├── leader.ts     # Leader: HTTP server + bridge
-        ├── follower.ts   # Follower: proxies to leader via HTTP
-        ├── node.ts       # Dynamic leader/follower role switching
-        ├── election.ts   # Leader election & health monitoring
-        ├── tools.ts      # MCP tool definitions
-        └── types.ts      # Shared types
+        ├── index.ts      # Точка входа
+        ├── bridge.ts     # WebSocket мост к Figma плагину
+        ├── leader.ts     # Лидер: HTTP сервер + мост
+        ├── follower.ts   # Фолловер: проксирует к лидеру через HTTP
+        ├── node.ts       # Динамическое переключение лидер/фолловер
+        ├── election.ts   # Выборы лидера и мониторинг здоровья
+        ├── tools.ts      # Определения MCP инструментов
+        ├── schema.ts     # Схемы валидации (Zod)
+        └── types.ts      # Общие типы
 ```
 
-## How it works
+## Как это работает
 
-Two main components:
+### Figma плагин
 
-### 1. The Figma Plugin
+Работает внутри Figma, подключается к MCP-серверу по WebSocket и передаёт данные документа по запросу.
 
-Runs inside Figma, connects to the local MCP server via WebSocket, and streams document data on demand. Also provides a direct **Export Selection** button for offline use.
+### MCP сервер
 
-### 2. The MCP Server
-
-Handles WebSocket connections from the plugin and exposes MCP tools to AI clients. Supports leader/follower election so multiple AI tools can connect simultaneously.
+Обрабатывает WebSocket подключения от плагина и предоставляет MCP инструменты AI-клиентам. Поддерживает выборы лидера/фолловера для одновременного подключения нескольких AI-инструментов.
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
@@ -185,32 +164,32 @@ Handles WebSocket connections from the plugin and exposes MCP tools to AI client
 │  │                    (TypeScript/React)                                 │  │
 │  └───────────────────────────────────────────────────────────────────────┘  │
 └─────────────────────────────────────────────────────────────────────────────┘
-                                      │
-                                      │ WebSocket
-                                      │ (ws://localhost:1994/ws)
-                                      ▼
+                                       │
+                                       │ WebSocket
+                                       │ (ws://localhost:1994/ws)
+                                       ▼
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                          PRIMARY MCP SERVER                                 │
 │                         (Leader on :1994)                                   │
 │  ┌─────────────────────────────────────────────────────────────────────┐    │
 │  │  Bridge                                    Endpoints:               │    │
 │  │  • Manages WebSocket conn                  • /ws    (plugin)        │    │
-│  │  • Forwards requests to plugin             • /ping  (health)        │    │
-│  │  • Routes responses back                   • /rpc   (followers)     │    │
+│  │  • Forwards requests to plugin             • /ping  (health)         │    │
+│  │  • Routes responses back                   • /rpc   (followers)      │    │
 │  └─────────────────────────────────────────────────────────────────────┘    │
 └─────────────────────────────────────────────────────────────────────────────┘
-                           ▲                              ▲
-                           │ HTTP /rpc                    │ HTTP /rpc
-                           │                              │
-         ┌─────────────────┴───────────┐    ┌─────────────┴───────────────┐
-         │    FOLLOWER MCP SERVER 1    │    │    FOLLOWER MCP SERVER 2    │
-         │  • Proxies tool calls       │    │  • Proxies tool calls       │
-         │  • Takes over if leader dies│    │  • Takes over if leader dies│
-         └─────────────────────────────┘    └─────────────────────────────┘
-                    ▲                                      ▲
-                    │ MCP Protocol (stdio)                  │ MCP Protocol (stdio)
-                    ▼                                      ▼
-         ┌─────────────────────────────┐    ┌─────────────────────────────┐
-         │      AI Tool / IDE 1        │    │      AI Tool / IDE 2        │
-         └─────────────────────────────┘    └─────────────────────────────┘
+                            ▲                              ▲
+                            │ HTTP /rpc                    │ HTTP /rpc
+                            │                              │
+          ┌─────────────────┴───────────┐    ┌─────────────┴───────────────┐
+          │    FOLLOWER MCP SERVER 1    │    │    FOLLOWER MCP SERVER 2    │
+          │  • Proxies tool calls       │    │  • Proxies tool calls       │
+          │  • Takes over if leader dies│    │  • Takes over if leader dies│
+          └─────────────────────────────┘    └─────────────────────────────┘
+                     ▲                                      ▲
+                     │ MCP Protocol (stdio)                  │ MCP Protocol (stdio)
+                     ▼                                      ▼
+          ┌─────────────────────────────┐    ┌─────────────────────────────┐
+          │      AI Tool / IDE 1        │    │      AI Tool / IDE 2        │
+          └─────────────────────────────┘    └─────────────────────────────┘
 ```

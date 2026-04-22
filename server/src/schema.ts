@@ -509,6 +509,17 @@ export const toolInputSchemas = {
     })).min(1).describe("Array of overrides to apply"),
     fileKey: fileKeyField,
   }),
+
+  batch_mutation: z.object({
+    operations: z.array(z.object({
+      type: z.string().describe("Operation type: create_frame, create_text, create_shape, set_position, set_size, set_fills, set_strokes, set_corner_radius, set_text_content, set_text_style, append_children, delete_node, find_nodes"),
+      nodeId: figmaNodeId.optional().describe("Target node ID for mutations"),
+      nodeIds: z.array(figmaNodeId).optional().describe("Target node IDs for batch operations"),
+      params: z.record(z.string(), z.unknown()).optional().describe("Operation parameters"),
+      ref: z.string().optional().describe("Temporary ref to assign to created node (use as tmp:refName in subsequent operations)"),
+    })).min(1).max(100).describe("Array of operations to execute atomically (max 100)"),
+    fileKey: fileKeyField,
+  }),
 } as const;
 
 type ToolName = keyof typeof toolInputSchemas;
@@ -551,6 +562,7 @@ const rpcToArgs: Record<
   create_component: (nodeIds, params) => ({ nodeId: nodeIds?.[0], ...params }),
   create_instance: (_nodeIds, params) => ({ ...params }),
   set_instance_properties: (nodeIds, params) => ({ nodeId: nodeIds?.[0], ...params }),
+  batch_mutation: (_nodeIds, params) => ({ ...params }),
 };
 
 /**

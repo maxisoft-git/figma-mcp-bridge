@@ -477,6 +477,17 @@ export function registerTools(server: McpServer, node: Node, port: number): void
       );
     }
   );
+
+  server.tool(
+    "batch_mutation",
+    "Execute multiple operations atomically. Supports creating frames, text nodes, shapes, setting properties (position, size, fills, strokes, corner radius), editing text, appending children, deleting nodes, and finding nodes. Use refs (tmp:refName) to reference nodes created in earlier operations within the same batch. Max 100 operations per call. When multiple files are connected, specify fileKey.",
+    toolInputSchemas.batch_mutation.shape,
+    async ({ fileKey, ...params }): Promise<ToolResult> => {
+      return renderResponse(() =>
+        node.sendWithParams("batch_mutation", undefined, params, fileKey)
+      );
+    }
+  );
 }
 
 export async function executeSaveScreenshots(
