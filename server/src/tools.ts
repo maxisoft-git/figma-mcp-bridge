@@ -196,12 +196,13 @@ export function registerTools(server: McpServer, node: Node, port: number): void
 
   server.tool(
     "get_image",
-    "Export a specific node as an image. Unlike get_screenshot which renders the visual appearance, this exports the node directly using Figma's export. Returns base64-encoded image data. Use this when you need the actual image data for a specific node (e.g., a rectangle with an image fill). When multiple files are connected, specify fileKey.",
+    "Export a specific node as an image. Set backgroundOnly to export only the background fill of a frame without its children. Returns base64-encoded image data. When multiple files are connected, specify fileKey.",
     toolInputSchemas.get_image.shape,
-    async ({ nodeId, format, scale, fileKey }): Promise<ToolResult> => {
+    async ({ nodeId, format, scale, backgroundOnly, fileKey }): Promise<ToolResult> => {
       const params: Record<string, unknown> = {};
       if (format) params.format = format;
       if (scale !== undefined && scale > 0) params.scale = scale;
+      if (backgroundOnly) params.backgroundOnly = true;
       return renderResponse(() =>
         node.sendWithParams("get_image", [nodeId], params, fileKey)
       );
