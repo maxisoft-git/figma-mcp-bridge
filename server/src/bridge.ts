@@ -60,16 +60,16 @@ export class Bridge {
   }
 
   private handleConnection(ws: WebSocket, fileKey: string, fileName: string): void {
-    // Protect existing live connection from being replaced
-    const existing = this.connections.get(fileKey);
+    const normalizedFileKey = fileKey.trim();
+    const existing = this.connections.get(normalizedFileKey);
     if (existing && existing.ws.readyState === WebSocket.OPEN) {
-      console.error(`Rejected duplicate connection for ${fileName} (${fileKey}): existing connection is alive`);
+      console.error(`Rejected duplicate connection for ${fileName} (${normalizedFileKey}): existing connection is alive`);
       ws.close();
       return;
     }
 
-    this.connections.set(fileKey, { ws, fileKey, fileName });
-    console.error(`Plugin connected: ${fileName} (${fileKey})`);
+    this.connections.set(normalizedFileKey, { ws, fileKey: normalizedFileKey, fileName });
+    console.error(`Plugin connected: ${fileName} (${normalizedFileKey})`);
     this.broadcastFiles();
     this.sendServerVersion(ws);
 
@@ -137,13 +137,14 @@ export class Bridge {
    */
   private resolveConnection(fileKey?: string): WebSocket {
     if (fileKey) {
-      const entry = this.connections.get(fileKey);
+      const normalizedFileKey = fileKey.trim();
+      const entry = this.connections.get(normalizedFileKey);
       if (!entry) {
         const available = this.listConnectedFiles();
         const hint = available.length > 0
           ? ` Connected files: ${available.map(f => `"${f.fileName}" (fileKey: ${f.fileKey})`).join(", ")}`
           : " No files are currently connected.";
-        throw new Error(`No plugin connected for fileKey "${fileKey}".${hint}`);
+        throw new Error(`No plugin connected for fileKey "${normalizedFileKey}".${hint}`);
       }
       return entry.ws;
     }
