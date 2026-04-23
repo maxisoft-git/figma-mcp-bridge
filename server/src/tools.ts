@@ -196,16 +196,51 @@ export function registerTools(server: McpServer, node: Node, port: number): void
 
   server.tool(
     "get_image",
-    "Export a specific node as an image. Set backgroundOnly to export only the background fill of a frame without its children. Returns base64-encoded image data. When multiple files are connected, specify fileKey.",
+    "Export a specific node as an image. Set backgroundOnly to export only the background fill of a frame without its children. If outputPath is provided, saves the image to disk instead of returning base64. When multiple files are connected, specify fileKey.",
     toolInputSchemas.get_image.shape,
-    async ({ nodeId, format, scale, backgroundOnly, fileKey }): Promise<ToolResult> => {
+    async ({ nodeId, format, scale, backgroundOnly, outputPath, fileKey }): Promise<ToolResult> => {
       const params: Record<string, unknown> = {};
       if (format) params.format = format;
       if (scale !== undefined && scale > 0) params.scale = scale;
       if (backgroundOnly) params.backgroundOnly = true;
-      return renderResponse(() =>
-        node.sendWithParams("get_image", [nodeId], params, fileKey)
-      );
+
+      const resp = await node.sendWithParams("get_image", [nodeId], params, fileKey);
+      if (resp.error) {
+        return { content: [{ type: "text", text: resp.error }], isError: true };
+      }
+
+      const data = resp.data as { base64?: string; nodeId: string; nodeName: string; format: string; scale: number; width: number; height: number };
+
+      if (outputPath && data.base64) {
+        try {
+          const resolvedPath = resolveAndValidateOutputPath(outputPath, process.cwd());
+          const bytesWritten = await writeBase64ToFile(data.base64, resolvedPath);
+          return {
+            content: [{
+              type: "text",
+              text: JSON.stringify({
+                nodeId: data.nodeId,
+                nodeName: data.nodeName,
+                format: data.format,
+                scale: data.scale,
+                width: data.width,
+                height: data.height,
+                outputPath: resolvedPath,
+                bytesWritten,
+              }),
+            }],
+          };
+        } catch (err) {
+          return {
+            content: [{ type: "text", text: err instanceof Error ? err.message : String(err) }],
+            isError: true,
+          };
+        }
+      }
+
+      return {
+        content: [{ type: "text", text: JSON.stringify(data) }],
+      };
     }
   );
 

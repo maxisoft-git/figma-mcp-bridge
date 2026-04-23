@@ -527,6 +527,7 @@ export const toolInputSchemas = {
       .optional()
       .describe("Export scale for raster formats (default 1)"),
     backgroundOnly: z.boolean().optional().describe("Export only the background fill without children (default false)"),
+    outputPath: z.string().optional().describe("If provided, save the image to this path instead of returning base64"),
     fileKey: fileKeyField,
   }),
 
