@@ -181,3 +181,10 @@ server/dist/
 .vscode/
 
 .claude/
+
+# macOS
+.DS_Store
+
+# Package lock files (use bun for plugin)
+server/package-lock.json
+plugin/package-lock.json
