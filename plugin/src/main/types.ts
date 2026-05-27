@@ -42,7 +42,13 @@ export type RequestType =
   | "create_instance"
   | "set_instance_properties"
   | "batch_mutation"
-  | "get_image";
+  | "get_image"
+  | "create_paint_style"
+  | "create_text_style"
+  | "create_effect_style"
+  | "create_grid_style"
+  | "create_variable_collection"
+  | "create_variable";
 
 export type ServerRequest = {
   type: RequestType;

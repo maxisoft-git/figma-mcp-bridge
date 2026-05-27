@@ -548,6 +548,72 @@ export function registerTools(server: McpServer, node: Node, port: number): void
       );
     }
   );
+
+  server.tool(
+    "create_paint_style",
+    "Create a new paint style (color or gradient) in the Figma document. Returns the new style's ID. When multiple files are connected, specify fileKey.",
+    toolInputSchemas.create_paint_style.shape,
+    async ({ fileKey, ...params }): Promise<ToolResult> => {
+      return renderResponse(() =>
+        node.sendWithParams("create_paint_style", undefined, params, fileKey)
+      );
+    }
+  );
+
+  server.tool(
+    "create_text_style",
+    "Create a new text style (font, size, line height, etc.) in the Figma document. Returns the new style's ID. When multiple files are connected, specify fileKey.",
+    toolInputSchemas.create_text_style.shape,
+    async ({ fileKey, ...params }): Promise<ToolResult> => {
+      return renderResponse(() =>
+        node.sendWithParams("create_text_style", undefined, params, fileKey)
+      );
+    }
+  );
+
+  server.tool(
+    "create_effect_style",
+    "Create a new effect style (shadow, blur) in the Figma document. Returns the new style's ID. When multiple files are connected, specify fileKey.",
+    toolInputSchemas.create_effect_style.shape,
+    async ({ fileKey, ...params }): Promise<ToolResult> => {
+      return renderResponse(() =>
+        node.sendWithParams("create_effect_style", undefined, params, fileKey)
+      );
+    }
+  );
+
+  server.tool(
+    "create_grid_style",
+    "Create a new grid style (columns, rows, or grid) in the Figma document. Returns the new style's ID. When multiple files are connected, specify fileKey.",
+    toolInputSchemas.create_grid_style.shape,
+    async ({ fileKey, ...params }): Promise<ToolResult> => {
+      return renderResponse(() =>
+        node.sendWithParams("create_grid_style", undefined, params, fileKey)
+      );
+    }
+  );
+
+  server.tool(
+    "create_variable_collection",
+    "Create a new variable collection (design token group) with modes (e.g., Light/Dark). Returns the new collection's ID. When multiple files are connected, specify fileKey.",
+    toolInputSchemas.create_variable_collection.shape,
+    async ({ fileKey, ...params }): Promise<ToolResult> => {
+      return renderResponse(() =>
+        node.sendWithParams("create_variable_collection", undefined, params, fileKey)
+      );
+    }
+  );
+
+  server.tool(
+    "create_variable",
+    "Create a new variable (design token) in a collection. Supports COLOR, FLOAT, STRING, and BOOLEAN types. Values are set per mode (by mode name or modeId). When multiple files are connected, specify fileKey.",
+    toolInputSchemas.create_variable.shape,
+    async ({ fileKey, ...params }): Promise<ToolResult> => {
+      return renderResponse(() =>
+        node.sendWithParams("create_variable", undefined, params, fileKey)
+      );
+    }
+  );
 }
 
 export async function executeSaveScreenshots(

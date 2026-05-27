@@ -44,6 +44,12 @@ import { handle as create_instance } from "./handlers/create_instance";
 import { handle as set_instance_properties } from "./handlers/set_instance_properties";
 import { handle as batch_mutation } from "./handlers/batch_mutation";
 import { handle as get_image } from "./handlers/get_image";
+import { handle as create_paint_style } from "./handlers/create_paint_style";
+import { handle as create_text_style } from "./handlers/create_text_style";
+import { handle as create_effect_style } from "./handlers/create_effect_style";
+import { handle as create_grid_style } from "./handlers/create_grid_style";
+import { handle as create_variable_collection } from "./handlers/create_variable_collection";
+import { handle as create_variable } from "./handlers/create_variable";
 
 type Handler = (request: ServerRequest) => Promise<PluginResponse>;
 
@@ -92,6 +98,12 @@ const handlers: Record<RequestType, Handler> = {
   set_instance_properties,
   batch_mutation,
   get_image,
+  create_paint_style,
+  create_text_style,
+  create_effect_style,
+  create_grid_style,
+  create_variable_collection,
+  create_variable,
 };
 
 export const dispatch = async (

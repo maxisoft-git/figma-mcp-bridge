@@ -541,6 +541,77 @@ export const toolInputSchemas = {
     })).min(1).max(100).describe("Array of operations to execute atomically (max 100)"),
     fileKey: fileKeyField,
   }),
+
+  create_paint_style: z.object({
+    name: z.string().describe("Name of the paint style (e.g., 'Primary/500')"),
+    paints: z.array(z.object({
+      type: z.enum(["SOLID", "GRADIENT_LINEAR", "GRADIENT_RADIAL", "GRADIENT_ANGULAR", "GRADIENT_DIAMOND"]).describe("Paint type"),
+      color: hexColor.optional().describe("Color as hex (for SOLID)"),
+      gradientStops: z.array(z.object({
+        color: hexColor.describe("Stop color as hex"),
+        position: z.number().min(0).max(1).describe("Stop position (0-1)"),
+      })).optional().describe("Gradient stops (for gradients)"),
+      gradientTransform: z.array(z.array(z.number())).optional().describe("Gradient transform matrix"),
+      opacity: z.number().min(0).max(1).optional().describe("Paint opacity"),
+    })).min(1).describe("Array of paints"),
+    fileKey: fileKeyField,
+  }),
+
+  create_text_style: z.object({
+    name: z.string().describe("Name of the text style (e.g., 'Heading/H1')"),
+    fontFamily: z.string().optional().describe("Font family (default: Inter)"),
+    fontStyle: z.string().optional().describe("Font style (default: Regular)"),
+    fontSize: z.number().positive().optional().describe("Font size in pixels"),
+    lineHeight: z.union([
+      z.number().describe("Line height in pixels"),
+      z.object({ value: z.number(), unit: z.enum(["PIXELS", "PERCENT"]) }),
+    ]).optional().describe("Line height"),
+    letterSpacing: z.number().optional().describe("Letter spacing in pixels"),
+    textDecoration: z.enum(["NONE", "UNDERLINE", "STRIKETHROUGH"]).optional().describe("Text decoration"),
+    textCase: z.enum(["ORIGINAL", "UPPER", "LOWER", "TITLE"]).optional().describe("Text case transformation"),
+    fileKey: fileKeyField,
+  }),
+
+  create_effect_style: z.object({
+    name: z.string().describe("Name of the effect style (e.g., 'Shadow/Lg')"),
+    effects: z.array(z.object({
+      type: z.enum(["DROP_SHADOW", "INNER_SHADOW", "LAYER_BLUR", "BACKGROUND_BLUR"]).describe("Effect type"),
+      color: hexColor.optional().describe("Effect color as hex (for shadows)"),
+      offset: z.object({ x: z.number(), y: z.number() }).optional().describe("Shadow offset"),
+      radius: z.number().min(0).optional().describe("Blur radius"),
+      spread: z.number().optional().describe("Shadow spread (for shadows)"),
+      blendMode: z.string().optional().describe("Blend mode (default: NORMAL)"),
+    })).min(1).describe("Array of effects"),
+    fileKey: fileKeyField,
+  }),
+
+  create_grid_style: z.object({
+    name: z.string().describe("Name of the grid style"),
+    layoutGrids: z.array(z.object({
+      pattern: z.enum(["COLUMNS", "ROWS", "GRID"]).describe("Grid pattern"),
+      alignment: z.enum(["STRETCH", "MIN", "MAX", "CENTER"]).optional().describe("Column/row alignment"),
+      count: z.number().optional().describe("Number of columns/rows"),
+      gutterSize: z.number().optional().describe("Gutter size in pixels"),
+      offset: z.number().optional().describe("Offset in pixels"),
+      sectionSize: z.number().optional().describe("Column width / row height / grid size"),
+      visible: z.boolean().optional().describe("Whether the grid is visible"),
+    })).min(1).describe("Array of layout grids"),
+    fileKey: fileKeyField,
+  }),
+
+  create_variable_collection: z.object({
+    name: z.string().describe("Name of the variable collection (e.g., 'Colors')"),
+    modes: z.array(z.string()).min(1).describe("Array of mode names (e.g., ['Light', 'Dark'])"),
+    fileKey: fileKeyField,
+  }),
+
+  create_variable: z.object({
+    name: z.string().describe("Name of the variable (e.g., 'primary/500')"),
+    collectionId: z.string().describe("ID of the variable collection"),
+    type: z.enum(["COLOR", "FLOAT", "STRING", "BOOLEAN"]).describe("Variable type"),
+    valuesByMode: z.record(z.string(), z.unknown()).describe("Values by mode name or modeId (e.g., { Light: '#007AFF', Dark: '#0A84FF' })"),
+    fileKey: fileKeyField,
+  }),
 } as const;
 
 type ToolName = keyof typeof toolInputSchemas;
@@ -585,6 +656,12 @@ const rpcToArgs: Record<
   set_instance_properties: (nodeIds, params) => ({ nodeId: nodeIds?.[0], ...params }),
   batch_mutation: (_nodeIds, params) => ({ ...params }),
   get_image: (nodeIds, params) => ({ nodeId: nodeIds?.[0], ...params }),
+  create_paint_style: (_nodeIds, params) => ({ ...params }),
+  create_text_style: (_nodeIds, params) => ({ ...params }),
+  create_effect_style: (_nodeIds, params) => ({ ...params }),
+  create_grid_style: (_nodeIds, params) => ({ ...params }),
+  create_variable_collection: (_nodeIds, params) => ({ ...params }),
+  create_variable: (_nodeIds, params) => ({ ...params }),
 };
 
 /**
