@@ -1,4 +1,31 @@
+## [0.6.0] — 2026-06-26
+
+### Changes
+- 
 # Changelog
+
+## [Unreleased] — Dev Mode Mirror integration
+
+### Dev Mode Mirror (ported from `../figma-dev`)
+
+Пять новых MCP-инструментов для экспорта CSS / SVG / HTML / JSON / IMG выбранной ноды (или ноды по `nodeId`). Реализация в `plugin/src/main/utils/dev-mode.ts` (общая логика) + 5 handler'ов в `plugin/src/main/handlers/get_dev_*.ts`.
+
+- **`get_dev_css`** — `getCSSAsync()` на одной ноде. Возвращает плоский CSS-стринг. Без обхода поддерева — безопасно вызывать на `selectionchange`.
+- **`get_dev_svg`** — `exportAsync({ format: "SVG_STRING" })` со всеми стилями inline как XML-атрибуты (как в Dev Mode).
+- **`get_dev_html`** — рекурсивный обход с лимитами `HTML_NODE_LIMIT=200` и `HTML_MAX_DEPTH=12`. Image fills **не** инлайнятся. Возвращает `{ html, truncated, visited }`.
+- **`get_dev_json`** — сырой объект `getCSSAsync()` + depth-2 structural dump из `serializeNode`. Удобно для AI-агентов: сразу и key/value CSS, и структура ноды.
+- **`get_dev_image`** — извлечение картинки. Стратегии: (1) прямой `imageHash`, (2) `imageHash` на direct child, (3) `node.exportAsync(PNG)` fallback. Возвращает `base64` + `mime` + `source` (`"node" | "child:<name>" | "export"`).
+
+### Архитектура
+
+- **Общий модуль:** `plugin/src/main/utils/dev-mode.ts` — `resolveNode`, `cssFor`, `buildHtml`, `findImageForNode`, `detectMime`, `escapeHtml`, `serializeCss`, `bytesToBase64Chunks`, `exportTab`.
+- **Helper:** `resolveNode(nodeId?)` — бросает структурированную ошибку если `nodeId` не найден или ничего не выбрано. Использует `PluginErrorCode.NODE_NOT_FOUND` / `VALIDATION_ERROR`.
+- **NodeId параметр:** все 5 инструментов принимают `nodeIds[0]` (через `rpcToArgs`). Если не передан — используется `figma.currentPage.selection[0]`.
+- **Серверная валидация:** добавлены Zod-схемы в `server/src/schema.ts` + mappers в `rpcToArgs`. При вызове без аргументов отдаёт пустой объект — nodeId берётся из `nodeIds[0]`.
+
+### UI (не затронут)
+
+Существующий React-UI в `plugin/src/ui/` **не показывает** вкладки Dev Mode Mirror — это MCP-only функционал для AI-агентов. Если потребуется визуальный UI с 5 вкладками (как в figma-dev/ui.html), добавим отдельной задачей.
 
 ## [0.5.0] — Структурированные ошибки и улучшения
 
