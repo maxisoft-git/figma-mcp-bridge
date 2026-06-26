@@ -103,7 +103,17 @@ describe("delete_nodes handler", () => {
         nodeIds: ["1:1"],
         params: { confirm: false },
       })
-    ).rejects.toThrow("delete_nodes requires confirm: true");
+    ).rejects.toThrow();
+  });
+
+  it("should throw for missing nodeIds", async () => {
+    await expect(
+      dispatch({
+        type: "delete_nodes",
+        requestId: "req-5b",
+        params: { confirm: true },
+      })
+    ).rejects.toThrow("nodeIds is required");
   });
 
   it("should return partial success when node not found", async () => {

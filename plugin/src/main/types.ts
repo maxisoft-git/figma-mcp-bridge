@@ -48,7 +48,12 @@ export type RequestType =
   | "create_effect_style"
   | "create_grid_style"
   | "create_variable_collection"
-  | "create_variable";
+  | "create_variable"
+  | "get_dev_css"
+  | "get_dev_svg"
+  | "get_dev_html"
+  | "get_dev_json"
+  | "get_dev_image";
 
 export type ServerRequest = {
   type: RequestType;

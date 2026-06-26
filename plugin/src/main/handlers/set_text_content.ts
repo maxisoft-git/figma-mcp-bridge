@@ -1,21 +1,14 @@
 import type { ServerRequest, PluginResponse } from "../types";
 import { getTextNodeById, loadFontsForTextNode } from "../utils";
+import { setTextContentSchema, validateParams } from "../schemas";
 
 export async function handle(request: ServerRequest): Promise<PluginResponse> {
-  const nodeId = request.nodeIds && request.nodeIds[0];
-  const text = request.params?.text;
-  if (!nodeId) {
-    throw new Error("nodeIds is required for set_text_content");
-  }
-  if (typeof text !== "string") {
-    throw new Error("text is required for set_text_content");
-  }
-
-  const node = await getTextNodeById(nodeId);
+  const params = validateParams(setTextContentSchema, request.params ?? {});
+  const node = await getTextNodeById(params.nodeId);
   await loadFontsForTextNode(node);
 
   const previousCharacters = node.characters;
-  node.characters = text;
+  node.characters = params.text;
 
   return {
     type: request.type,

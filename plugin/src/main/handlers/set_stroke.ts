@@ -1,22 +1,22 @@
 import type { ServerRequest, PluginResponse } from "../types";
 import { getSceneNodeById, parseHexColor } from "../utils";
+import { setStrokeSchema, validateParams } from "../schemas";
+import { createError, PluginErrorCode } from "../errors";
 
 export async function handle(request: ServerRequest): Promise<PluginResponse> {
-  const nodeId = request.nodeIds && request.nodeIds[0];
-  if (!nodeId) {
-    throw new Error("nodeIds is required for set_stroke");
-  }
-
-  const node = await getSceneNodeById(nodeId);
-  const params = request.params ?? {};
+  const params = validateParams(setStrokeSchema, request.params ?? {});
+  const node = await getSceneNodeById(params.nodeId);
   const applied: Record<string, unknown> = {};
 
   if (!("strokes" in node)) {
-    throw new Error(`Node does not support strokes: ${nodeId}`);
+    throw createError(
+      PluginErrorCode.UNSUPPORTED_OPERATION,
+      `Node does not support strokes: ${params.nodeId}`,
+    );
   }
 
   if (typeof params.strokeHex === "string") {
-    const strokeOpacity = typeof params.strokeOpacity === "number" ? params.strokeOpacity : 1;
+    const strokeOpacity = params.strokeOpacity ?? 1;
     node.strokes = [
       {
         type: "SOLID",

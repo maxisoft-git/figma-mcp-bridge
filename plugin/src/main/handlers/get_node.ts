@@ -1,5 +1,5 @@
 import type { ServerRequest, PluginResponse } from "../types";
-import { serializeNode, enrichWithImageData } from "../serializer";
+import { serializeNode, enrichWithImageData, resolveStyleReferences } from "../serializer";
 import { nodeNotFound, validationError } from "../errors";
 
 export async function handle(request: ServerRequest): Promise<PluginResponse> {
@@ -13,7 +13,11 @@ export async function handle(request: ServerRequest): Promise<PluginResponse> {
   }
   const includeHidden = request.params?.includeHidden === true;
   const includeImageData = request.params?.includeImageData === true;
-  let data = serializeNode(node as SceneNode, { includeHidden });
+  const enrich = request.params?.enrich === true;
+  let data = serializeNode(node as SceneNode, { includeHidden, enrich });
+  if (enrich) {
+    data = await resolveStyleReferences(data);
+  }
   if (includeImageData) {
     data = await enrichWithImageData(data);
   }

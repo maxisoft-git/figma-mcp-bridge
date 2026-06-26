@@ -14,6 +14,6 @@ export default defineConfig({
         inlineDynamicImports: true
       }
     },
-    emptyOutDir: true
+    emptyOutDir: false
   }
 });

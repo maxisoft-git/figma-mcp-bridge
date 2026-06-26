@@ -251,12 +251,14 @@ export const toolInputSchemas = {
     fileKey: fileKeyField,
     includeHidden: z.boolean().optional().describe("Include hidden nodes in the tree (default false)"),
     includeImageData: z.boolean().optional().describe("Include actual image bytes for nodes with image fills (default false)"),
+    enrich: z.boolean().optional().describe("Resolve style references and bound variables to human-readable names + values for accurate code generation (default false)"),
   }),
 
   get_selection: z.object({
     fileKey: fileKeyField,
     includeHidden: z.boolean().optional().describe("Include hidden children in the tree (default false)"),
     includeImageData: z.boolean().optional().describe("Include actual image bytes for nodes with image fills (default false)"),
+    enrich: z.boolean().optional().describe("Resolve style references and bound variables to human-readable names + values for accurate code generation (default false)"),
   }),
 
   get_node: z.object({
@@ -264,6 +266,7 @@ export const toolInputSchemas = {
     fileKey: fileKeyField,
     includeHidden: z.boolean().optional().describe("Include hidden children in the tree (default false)"),
     includeImageData: z.boolean().optional().describe("Include actual image bytes for nodes with image fills (default false)"),
+    enrich: z.boolean().optional().describe("Resolve style references and bound variables to human-readable names + values for accurate code generation (default false)"),
   }),
 
   get_styles: z.object({
@@ -281,6 +284,7 @@ export const toolInputSchemas = {
       .describe("How many levels deep to traverse the node tree (default 2)"),
     includeHidden: z.boolean().optional().describe("Include hidden nodes (default false)"),
     includeImageData: z.boolean().optional().describe("Include actual image bytes for nodes with image fills (default false)"),
+    enrich: z.boolean().optional().describe("Resolve style references and bound variables to human-readable names + values for accurate code generation (default false)"),
     fileKey: fileKeyField,
   }),
 
@@ -511,7 +515,17 @@ export const toolInputSchemas = {
     overrides: z.array(z.object({
       targetNodeId: figmaNodeId.optional().describe("Node ID of the child to override"),
       targetNodeName: z.string().optional().describe("Name of the child to override"),
-      field: z.enum(["characters", "fills", "opacity", "visible", "name"]).describe("Property to override"),
+      field: z.enum([
+        "characters",
+        "fills",
+        "fill",
+        "strokes",
+        "opacity",
+        "visible",
+        "name",
+        "fontSize",
+        "fontFamily",
+      ]).describe("Property to override"),
       value: z.union([z.string(), z.number(), z.boolean()]).describe("New value for the property"),
     })).min(1).describe("Array of overrides to apply"),
     fileKey: fileKeyField,
@@ -612,6 +626,34 @@ export const toolInputSchemas = {
     valuesByMode: z.record(z.string(), z.unknown()).describe("Values by mode name or modeId (e.g., { Light: '#007AFF', Dark: '#0A84FF' })"),
     fileKey: fileKeyField,
   }),
+
+  // Dev Mode Mirror — ported from figma-dev. Exports CSS, SVG, HTML, JSON, IMG
+  // for a single node (selected by default or by nodeId).
+  get_dev_css: z.object({
+    fileKey: fileKeyField,
+  }).describe(
+    "Dev Mode Mirror: get the CSS for a node (selected by default, or pass nodeId in nodeIds). Returns plain CSS string for the single node — no subtree walk."
+  ),
+  get_dev_svg: z.object({
+    fileKey: fileKeyField,
+  }).describe(
+    "Dev Mode Mirror: export a node as SVG with all styles inlined as XML attributes (matches what Figma's Dev Mode shows)."
+  ),
+  get_dev_html: z.object({
+    fileKey: fileKeyField,
+  }).describe(
+    "Dev Mode Mirror: compose a simplified HTML document for a node by walking its children. Capped at 200 nodes / 12 levels deep to keep the sandbox responsive. Image fills are NOT inlined."
+  ),
+  get_dev_json: z.object({
+    fileKey: fileKeyField,
+  }).describe(
+    "Dev Mode Mirror: get the raw getCSSAsync() key/value object for a node, plus a depth-2 structural dump of the node tree."
+  ),
+  get_dev_image: z.object({
+    fileKey: fileKeyField,
+  }).describe(
+    "Dev Mode Mirror: extract the image from a node. Tries (1) direct imageHash, (2) imageHash on a direct child, (3) node.exportAsync(PNG) fallback. Returns base64 string + mime + source."
+  ),
 } as const;
 
 type ToolName = keyof typeof toolInputSchemas;
@@ -662,6 +704,11 @@ const rpcToArgs: Record<
   create_grid_style: (_nodeIds, params) => ({ ...params }),
   create_variable_collection: (_nodeIds, params) => ({ ...params }),
   create_variable: (_nodeIds, params) => ({ ...params }),
+  get_dev_css: (nodeIds, params) => ({ nodeId: nodeIds?.[0], ...params }),
+  get_dev_svg: (nodeIds, params) => ({ nodeId: nodeIds?.[0], ...params }),
+  get_dev_html: (nodeIds, params) => ({ nodeId: nodeIds?.[0], ...params }),
+  get_dev_json: (nodeIds, params) => ({ nodeId: nodeIds?.[0], ...params }),
+  get_dev_image: (nodeIds, params) => ({ nodeId: nodeIds?.[0], ...params }),
 };
 
 /**

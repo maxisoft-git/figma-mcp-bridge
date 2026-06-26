@@ -614,6 +614,62 @@ export function registerTools(server: McpServer, node: Node, port: number): void
       );
     }
   );
+
+  // ---- Dev Mode Mirror (ported from figma-dev) ----
+  server.tool(
+    "get_dev_css",
+    "Dev Mode Mirror: get CSS for a node. Uses figma.getCSSAsync() on the single node (no subtree walk). Pass nodeIds[0] to target a specific node; otherwise uses the current selection. Returns { nodeId, nodeName, nodeType, css }.",
+    toolInputSchemas.get_dev_css.shape,
+    async ({ fileKey, nodeIds }): Promise<ToolResult> => {
+      return renderResponse(() =>
+        node.sendWithParams("get_dev_css", nodeIds, undefined, fileKey)
+      );
+    }
+  );
+
+  server.tool(
+    "get_dev_svg",
+    "Dev Mode Mirror: export a node as SVG with all styles inlined as XML attributes (matches what Figma's Dev Mode shows). Pass nodeIds[0] to target a specific node; otherwise uses the current selection. Returns { nodeId, nodeName, nodeType, svg }.",
+    toolInputSchemas.get_dev_svg.shape,
+    async ({ fileKey, nodeIds }): Promise<ToolResult> => {
+      return renderResponse(() =>
+        node.sendWithParams("get_dev_svg", nodeIds, undefined, fileKey)
+      );
+    }
+  );
+
+  server.tool(
+    "get_dev_html",
+    "Dev Mode Mirror: compose a simplified HTML document for a node by walking its children. Capped at 200 nodes / 12 levels deep to keep the sandbox responsive. Image fills are NOT inlined. Pass nodeIds[0] to target a specific node; otherwise uses the current selection. Returns { nodeId, nodeName, nodeType, html, truncated, visited }.",
+    toolInputSchemas.get_dev_html.shape,
+    async ({ fileKey, nodeIds }): Promise<ToolResult> => {
+      return renderResponse(() =>
+        node.sendWithParams("get_dev_html", nodeIds, undefined, fileKey)
+      );
+    }
+  );
+
+  server.tool(
+    "get_dev_json",
+    "Dev Mode Mirror: get the raw getCSSAsync() key/value object for a node, plus a depth-2 structural dump of the node tree. Pass nodeIds[0] to target a specific node; otherwise uses the current selection. Returns { nodeId, nodeName, nodeType, css: { ... }, node: SerializedNode }.",
+    toolInputSchemas.get_dev_json.shape,
+    async ({ fileKey, nodeIds }): Promise<ToolResult> => {
+      return renderResponse(() =>
+        node.sendWithParams("get_dev_json", nodeIds, undefined, fileKey)
+      );
+    }
+  );
+
+  server.tool(
+    "get_dev_image",
+    "Dev Mode Mirror: extract the image from a node. Tries (1) direct imageHash, (2) imageHash on a direct child, (3) node.exportAsync(PNG) fallback. Pass nodeIds[0] to target a specific node; otherwise uses the current selection. Returns { nodeId, nodeName, nodeType, mime, source, scaleMode, base64, bytes }.",
+    toolInputSchemas.get_dev_image.shape,
+    async ({ fileKey, nodeIds }): Promise<ToolResult> => {
+      return renderResponse(() =>
+        node.sendWithParams("get_dev_image", nodeIds, undefined, fileKey)
+      );
+    }
+  );
 }
 
 export async function executeSaveScreenshots(

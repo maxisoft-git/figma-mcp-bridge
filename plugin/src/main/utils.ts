@@ -190,6 +190,102 @@ export const sendStatus = () => {
   });
 };
 
+export type PropRule<TNode extends SceneNode = SceneNode> = {
+  key: string;
+  guard: (value: unknown) => boolean;
+  capability?: (node: TNode) => boolean;
+  apply: (node: TNode, value: unknown) => void;
+};
+
+export class PropertyApplicationError extends Error {
+  constructor(
+    public readonly nodeId: string,
+    public readonly property: string,
+    message: string,
+  ) {
+    super(message);
+    this.name = "PropertyApplicationError";
+  }
+}
+
+export function applyProps<TNode extends SceneNode>(
+  node: TNode,
+  params: Record<string, unknown>,
+  rules: PropRule<TNode>[],
+  applied: Record<string, unknown>,
+): void {
+  for (const rule of rules) {
+    const value = params[rule.key];
+    if (value === undefined) continue;
+    if (!rule.guard(value)) continue;
+    if (rule.capability && !rule.capability(node)) {
+      throw new PropertyApplicationError(
+        node.id,
+        rule.key,
+        `Node does not support ${rule.key}: ${node.id}`,
+      );
+    }
+    rule.apply(node, value);
+    const next = (node as unknown as Record<string, unknown>)[rule.key];
+    applied[rule.key] = next;
+  }
+}
+
+export const numericProp = (key: string): PropRule => ({
+  key,
+  guard: (v) => typeof v === "number" && !Number.isNaN(v),
+  capability: (n) => key in (n as object),
+  apply: (n, v) => {
+    (n as unknown as Record<string, unknown>)[key] = v;
+  },
+});
+
+export const booleanProp = (key: string): PropRule => ({
+  key,
+  guard: (v) => typeof v === "boolean",
+  capability: (n) => key in (n as object),
+  apply: (n, v) => {
+    (n as unknown as Record<string, unknown>)[key] = v;
+  },
+});
+
+export const stringProp = (key: string): PropRule => ({
+  key,
+  guard: (v) => typeof v === "string",
+  capability: (n) => key in (n as object),
+  apply: (n, v) => {
+    (n as unknown as Record<string, unknown>)[key] = v;
+  },
+});
+
+export async function withTextFonts<T>(node: TextNode, fn: () => Promise<T>): Promise<T> {
+  await loadFontsForTextNode(node);
+  return fn();
+}
+
+export async function exportWithHiddenChildren(
+  node: SceneNode,
+  exportSettings: ExportSettings,
+  exportFn: (settings: ExportSettings) => Promise<Uint8Array>,
+): Promise<Uint8Array> {
+  if (!("children" in node) || node.children.length === 0) {
+    return exportFn(exportSettings);
+  }
+
+  const saved: boolean[] = [];
+  for (const child of node.children) {
+    saved.push(child.visible !== false);
+    child.visible = false;
+  }
+  try {
+    return await exportFn(exportSettings);
+  } finally {
+    for (let i = 0; i < node.children.length; i++) {
+      node.children[i].visible = saved[i];
+    }
+  }
+}
+
 export const serializeVariableValue = (value: VariableValue): unknown => {
   if (typeof value === "object" && value !== null) {
     if ("type" in value && value.type === "VARIABLE_ALIAS") {

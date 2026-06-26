@@ -1,14 +1,16 @@
 import type { ServerRequest, PluginResponse } from "../types";
-import { serializeNode, enrichWithImageData, type SerializeOptions } from "../serializer";
+import { serializeNode, enrichWithImageData, resolveStyleReferences, type SerializeOptions } from "../serializer";
 
 export async function handle(request: ServerRequest): Promise<PluginResponse> {
   const depth =
     typeof request.params?.depth === "number" ? request.params.depth : 2;
   const includeImageData = request.params?.includeImageData === true;
+  const enrich = request.params?.enrich === true;
   const options: SerializeOptions = {
     includeHidden: request.params?.includeHidden === true,
     depth,
     currentDepth: 0,
+    enrich,
   };
 
   const selection = figma.currentPage.selection;
@@ -17,6 +19,10 @@ export async function handle(request: ServerRequest): Promise<PluginResponse> {
       ? selection.map((node) => serializeNode(node, options))
       : [serializeNode(figma.currentPage as unknown as SceneNode, options)]
   );
+
+  if (enrich) {
+    contextNodes = await Promise.all(contextNodes.map(resolveStyleReferences));
+  }
 
   if (includeImageData) {
     contextNodes = await Promise.all(

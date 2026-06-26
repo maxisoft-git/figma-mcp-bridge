@@ -1,5 +1,6 @@
 import type { ServerRequest, PluginResponse } from "../types";
 import { validationError } from "../errors";
+import { exportWithHiddenChildren } from "../utils";
 
 export async function handle(request: ServerRequest): Promise<PluginResponse> {
   const nodeId = request.nodeIds && request.nodeIds[0];
@@ -20,6 +21,10 @@ export async function handle(request: ServerRequest): Promise<PluginResponse> {
   if (!node || node.type === "DOCUMENT" || node.type === "PAGE") {
     throw new Error(`Node not found: ${nodeId}`);
   }
+  if (!("exportAsync" in node)) {
+    throw new Error(`Node does not support export: ${nodeId}`);
+  }
+  const exportable = node as SceneNode & { exportAsync: (s: ExportSettings) => Promise<Uint8Array> };
 
   const exportSettings: ExportSettings =
     format === "SVG"
@@ -28,25 +33,13 @@ export async function handle(request: ServerRequest): Promise<PluginResponse> {
         ? { format: "JPG", constraint: { type: "SCALE", value: scale } }
         : { format: "PNG", constraint: { type: "SCALE", value: scale } };
 
-  let base64: string;
-  if (backgroundOnly && "children" in node && node.children.length > 0) {
-    const savedVisibility: boolean[] = [];
-    for (const child of node.children) {
-      savedVisibility.push(child.visible !== false);
-      child.visible = false;
-    }
-    try {
-      const bytes = await node.exportAsync(exportSettings);
-      base64 = figma.base64Encode(bytes);
-    } finally {
-      for (let i = 0; i < node.children.length; i++) {
-        node.children[i].visible = savedVisibility[i];
-      }
-    }
-  } else {
-    const bytes = await node.exportAsync(exportSettings);
-    base64 = figma.base64Encode(bytes);
-  }
+  const bytes = backgroundOnly
+    ? await exportWithHiddenChildren(exportable, exportSettings, (s) =>
+        exportable.exportAsync(s),
+      )
+    : await exportable.exportAsync(exportSettings);
+
+  const base64 = figma.base64Encode(bytes);
 
   return {
     type: request.type,
@@ -57,8 +50,8 @@ export async function handle(request: ServerRequest): Promise<PluginResponse> {
       format,
       scale,
       base64,
-      width: node.width,
-      height: node.height,
+      width: "width" in node ? (node.width as number) : 0,
+      height: "height" in node ? (node.height as number) : 0,
     },
   };
 }

@@ -316,3 +316,66 @@ describe("parseHexColor", () => {
     expect(() => parseHexColor("#GGGGGG")).toThrow();
   });
 });
+
+describe("serializeNode with enrich option", () => {
+  it("should always include absoluteBounds when available", () => {
+    const node = createMockSceneNode({
+      id: "1:1",
+      type: "FRAME",
+      absoluteBoundingBox: { x: 100, y: 200, width: 300, height: 400 },
+    });
+
+    const result = serializeNode(node as any);
+
+    expect(result.absoluteBounds).toEqual({ x: 100, y: 200, width: 300, height: 400 });
+  });
+
+  it("should include styleReferences when enrich=true and node has fillStyleId", () => {
+    const node = createMockSceneNode({
+      id: "1:1",
+      type: "RECTANGLE",
+      fillStyleId: "S:abc123",
+    });
+
+    const result = serializeNode(node as any, { enrich: true });
+
+    expect(result.styleReferences?.fillStyleId).toEqual({
+      id: "S:abc123",
+      name: "(unresolved)",
+    });
+  });
+
+  it("should NOT include styleReferences when enrich=false (default)", () => {
+    const node = createMockSceneNode({
+      id: "1:1",
+      type: "RECTANGLE",
+      fillStyleId: "S:abc123",
+    });
+
+    const result = serializeNode(node as any);
+
+    expect(result.styleReferences).toBeUndefined();
+  });
+
+  it("should not break when fills is 'mixed' (the for...of bug)", () => {
+    const node = createMockSceneNode({
+      id: "1:1",
+      type: "FRAME",
+      children: [
+        createMockSceneNode({
+          id: "1:2",
+          type: "RECTANGLE",
+          visible: true,
+        }),
+      ],
+      styles: undefined,
+    });
+    // Manually set styles.fills to "mixed" (mimics mixed values across children)
+    (node as any).styles = { fills: "mixed" };
+
+    const result = serializeNode(node as any, { enrich: true });
+
+    expect(result.children).toHaveLength(1);
+    expect(result.children?.[0].id).toBe("1:2");
+  });
+});

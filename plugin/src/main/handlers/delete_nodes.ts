@@ -1,15 +1,13 @@
 import type { ServerRequest, PluginResponse } from "../types";
 import { isSceneNode } from "../utils";
+import { deleteNodesSchema, validateParams } from "../schemas";
 import { createError, PluginErrorCode } from "../errors";
 
 export async function handle(request: ServerRequest): Promise<PluginResponse> {
-  if (request.params?.confirm !== true) {
-    throw createError(PluginErrorCode.VALIDATION_ERROR, "delete_nodes requires confirm: true");
-  }
+  validateParams(deleteNodesSchema, request.params ?? {});
   if (!request.nodeIds || request.nodeIds.length === 0) {
     throw createError(PluginErrorCode.VALIDATION_ERROR, "nodeIds is required for delete_nodes");
   }
-
   const results = await Promise.all(
     request.nodeIds.map(async (nodeId) => {
       try {
@@ -33,7 +31,7 @@ export async function handle(request: ServerRequest): Promise<PluginResponse> {
           success: false,
           error: createError(
             PluginErrorCode.OPERATION_FAILED,
-            err instanceof Error ? err.message : String(err)
+            err instanceof Error ? err.message : String(err),
           ),
         };
       }
@@ -41,7 +39,7 @@ export async function handle(request: ServerRequest): Promise<PluginResponse> {
   );
 
   const succeeded = results.filter((r) => r.success).length;
-  const failed = results.filter((r) => !r.success).length;
+  const failed = results.length - succeeded;
 
   return {
     type: request.type,

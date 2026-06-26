@@ -100,10 +100,58 @@ type SerializedNode = {
   name: string;
   type: string;
   bounds?: SerializedBounds;
+  absoluteBounds?: SerializedBounds;
   characters?: string;
   styles?: SerializedStyles;
+  styleReferences?: SerializedStyleReferences;
+  boundVariables?: SerializedBoundVariables;
   children?: SerializedNode[];
   childCount?: number;
+};
+
+type SerializedStyleReferences = {
+  fillStyleId?: StyleReferenceEntry;
+  strokeStyleId?: StyleReferenceEntry;
+  textStyleId?: StyleReferenceEntry;
+  effectStyleId?: StyleReferenceEntry;
+  gridStyleId?: StyleReferenceEntry;
+};
+
+type StyleReferenceEntry = {
+  id: string;
+  name: string;
+  description?: string;
+  key?: string;
+  paints?: SerializedPaint[];
+  text?: {
+    fontName: { family: string; style: string } | "mixed";
+    fontSize: number | "mixed";
+    lineHeight: { value: number; unit: string } | { unit: string } | "mixed";
+    letterSpacing: { value: number; unit: string } | "mixed";
+  };
+  effects?: SerializedEffect[];
+  layoutGrids?: Array<{
+    pattern: string;
+    alignment?: string;
+    count?: number;
+    gutterSize?: number;
+    offset?: number;
+    sectionSize?: number;
+    visible?: boolean;
+  }>;
+};
+
+type SerializedBoundVariables = {
+  fills?: Array<{ index: number; property: "color"; id: string; name: string; resolvedType: string }>;
+  strokes?: Array<{ index: number; property: "color"; id: string; name: string; resolvedType: string }>;
+  cornerRadius?: Array<{ id: string; name: string; resolvedType: string }>;
+  paddingLeft?: Array<{ id: string; name: string; resolvedType: string }>;
+  paddingRight?: Array<{ id: string; name: string; resolvedType: string }>;
+  paddingTop?: Array<{ id: string; name: string; resolvedType: string }>;
+  paddingBottom?: Array<{ id: string; name: string; resolvedType: string }>;
+  itemSpacing?: Array<{ id: string; name: string; resolvedType: string }>;
+  width?: Array<{ id: string; name: string; resolvedType: string }>;
+  height?: Array<{ id: string; name: string; resolvedType: string }>;
 };
 
 const isMixed = (value: unknown): value is symbol => typeof value === "symbol";
@@ -386,6 +434,7 @@ export type SerializeOptions = {
   depth?: number;
   currentDepth?: number;
   includeImageData?: boolean;
+  enrich?: boolean;
 };
 
 export const serializeNode = (
@@ -397,8 +446,14 @@ export const serializeNode = (
     name: node.name,
     type: node.type,
     bounds: getBounds(node),
+    absoluteBounds: getAbsoluteBounds(node),
     styles: serializeStyles(node),
   };
+
+  if (options?.enrich) {
+    base.styleReferences = collectStyleReferences(node);
+    base.boundVariables = collectBoundVariables(node);
+  }
 
   if (node.type === "TEXT") {
     return serializeText(node, base);
@@ -431,17 +486,244 @@ export const serializeNode = (
   return base;
 };
 
+const getAbsoluteBounds = (node: SceneNode): SerializedBounds | undefined => {
+  const box = node.absoluteBoundingBox;
+  if (!box) return undefined;
+  return { x: box.x, y: box.y, width: box.width, height: box.height };
+};
+
+function collectStyleReferences(node: SceneNode): SerializedStyleReferences | undefined {
+  const refs: SerializedStyleReferences = {};
+  let hasAny = false;
+
+  if ("fillStyleId" in node) {
+    const id = node.fillStyleId;
+    if (typeof id === "string" && id) {
+      refs.fillStyleId = { id, name: "(unresolved)" };
+      hasAny = true;
+    }
+  }
+  if ("strokeStyleId" in node) {
+    const id = node.strokeStyleId;
+    if (typeof id === "string" && id) {
+      refs.strokeStyleId = { id, name: "(unresolved)" };
+      hasAny = true;
+    }
+  }
+  if ("textStyleId" in node) {
+    const id = node.textStyleId;
+    if (typeof id === "string" && id) {
+      refs.textStyleId = { id, name: "(unresolved)" };
+      hasAny = true;
+    }
+  }
+  if ("effectStyleId" in node) {
+    const id = node.effectStyleId;
+    if (typeof id === "string" && id) {
+      refs.effectStyleId = { id, name: "(unresolved)" };
+      hasAny = true;
+    }
+  }
+  if ("gridStyleId" in node) {
+    const id = node.gridStyleId;
+    if (typeof id === "string" && id) {
+      refs.gridStyleId = { id, name: "(unresolved)" };
+      hasAny = true;
+    }
+  }
+
+  return hasAny ? refs : undefined;
+}
+
+export async function resolveStyleReferences(
+  node: SerializedNode,
+): Promise<SerializedNode> {
+  if (!node.styleReferences) return node;
+
+  await Promise.all([
+    node.styleReferences.fillStyleId
+      ? resolveAndApplyStyle(node.styleReferences, "fillStyleId")
+      : Promise.resolve(),
+    node.styleReferences.strokeStyleId
+      ? resolveAndApplyStyle(node.styleReferences, "strokeStyleId")
+      : Promise.resolve(),
+    node.styleReferences.textStyleId
+      ? resolveAndApplyStyle(node.styleReferences, "textStyleId")
+      : Promise.resolve(),
+    node.styleReferences.effectStyleId
+      ? resolveAndApplyStyle(node.styleReferences, "effectStyleId")
+      : Promise.resolve(),
+    node.styleReferences.gridStyleId
+      ? resolveAndApplyStyle(node.styleReferences, "gridStyleId")
+      : Promise.resolve(),
+  ]);
+
+  if (node.children) {
+    await Promise.all(node.children.map(resolveStyleReferences));
+  }
+
+  return node;
+}
+
+async function resolveAndApplyStyle(
+  refs: SerializedStyleReferences,
+  kind: keyof SerializedStyleReferences,
+): Promise<void> {
+  const ref = refs[kind];
+  if (!ref) return;
+  try {
+    const style = await figma.getStyleByIdAsync(ref.id);
+    if (!style) return;
+    ref.name = style.name;
+    if ("description" in style) ref.description = style.description;
+    if (style.type === "PAINT") {
+      ref.paints = (style as PaintStyle).paints
+        .filter((p) => p.visible !== false)
+        .map((p) => serializePaint(p))
+        .filter((p): p is SerializedPaint => p !== null);
+    } else if (style.type === "TEXT") {
+      const ts = style as TextStyle;
+      ref.text = {
+        fontName: isMixed(ts.fontName)
+          ? "mixed"
+          : { family: ts.fontName.family, style: ts.fontName.style },
+        fontSize: isMixed(ts.fontSize) ? "mixed" : ts.fontSize,
+        lineHeight: serializeLineHeight(ts.lineHeight),
+        letterSpacing: serializeLetterSpacing(ts.letterSpacing),
+      };
+    } else if (style.type === "EFFECT") {
+      ref.effects = serializeEffects((style as EffectStyle).effects);
+    } else if (style.type === "GRID") {
+      ref.layoutGrids = (style as GridStyle).layoutGrids.map((g) => ({
+        pattern: g.pattern,
+        alignment: g.alignment,
+        count: g.count,
+        gutterSize: g.gutterSize,
+        offset: g.offset,
+        sectionSize: g.sectionSize,
+        visible: g.visible,
+      }));
+    }
+  } catch {
+    // style not found, leave as unresolved
+  }
+}
+
+function serializePaint(paint: Paint): SerializedPaint | null {
+  if (paint.type === "SOLID") {
+    return { type: "SOLID", color: toHex(paint.color), opacity: paint.opacity };
+  }
+  if (
+    paint.type === "GRADIENT_LINEAR" ||
+    paint.type === "GRADIENT_RADIAL" ||
+    paint.type === "GRADIENT_ANGULAR" ||
+    paint.type === "GRADIENT_DIAMOND"
+  ) {
+    return {
+      type: paint.type,
+      gradientStops: serializeGradientStops(paint.gradientStops),
+      gradientTransform: paint.gradientTransform,
+      opacity: paint.opacity,
+    };
+  }
+  if (paint.type === "IMAGE") {
+    return {
+      type: "IMAGE",
+      scaleMode: paint.scaleMode,
+      imageHash: paint.imageHash,
+      imageTransform: paint.imageTransform,
+      opacity: paint.opacity,
+    };
+  }
+  return null;
+}
+
+function collectBoundVariables(node: SceneNode): SerializedBoundVariables | undefined {
+  const result: SerializedBoundVariables = {};
+  let hasAny = false;
+
+  const collectFromPaints = (
+    paints: readonly Paint[] | symbol | undefined,
+    kind: "fills" | "strokes",
+  ): void => {
+    if (isMixed(paints) || !Array.isArray(paints)) return;
+    const entries: Array<{ index: number; property: "color"; id: string; name: string; resolvedType: string }> = [];
+    paints.forEach((paint, index) => {
+      const bv = (paint as { boundVariables?: Record<string, { type: string; id: string } | undefined> })
+        .boundVariables;
+      const colorVar = bv?.color;
+      if (colorVar && colorVar.type === "VARIABLE_ALIAS") {
+        const v = figma.variables.getVariableById(colorVar.id);
+        if (v) {
+          entries.push({
+            index,
+            property: "color",
+            id: v.id,
+            name: v.name,
+            resolvedType: v.resolvedType,
+          });
+        }
+      }
+    });
+    if (entries.length > 0) {
+      result[kind] = entries;
+      hasAny = true;
+    }
+  };
+
+  if ("fills" in node) collectFromPaints(node.fills as readonly Paint[] | symbol, "fills");
+  if ("strokes" in node) collectFromPaints(node.strokes as readonly Paint[] | symbol, "strokes");
+
+  const collectScalarVar = (
+    key: "cornerRadius" | "paddingLeft" | "paddingRight" | "paddingTop" | "paddingBottom" | "itemSpacing" | "width" | "height",
+  ): void => {
+    if (!(key in node)) return;
+    const nodeWithBv = node as unknown as Record<string, unknown>;
+    const bv = (nodeWithBv[`${key}BoundVariables`] ?? nodeWithBv.boundVariables) as
+      | Record<string, { type: string; id: string } | undefined>
+      | undefined;
+    if (!bv) return;
+    const directAlias = bv[key];
+    if (!directAlias || directAlias.type !== "VARIABLE_ALIAS") return;
+    const v = figma.variables.getVariableById(directAlias.id);
+    if (!v) return;
+    result[key] = [{ id: v.id, name: v.name, resolvedType: v.resolvedType }];
+    hasAny = true;
+  };
+
+  collectScalarVar("cornerRadius");
+  collectScalarVar("paddingLeft");
+  collectScalarVar("paddingRight");
+  collectScalarVar("paddingTop");
+  collectScalarVar("paddingBottom");
+  collectScalarVar("itemSpacing");
+  collectScalarVar("width");
+  collectScalarVar("height");
+
+  return hasAny ? result : undefined;
+}
+
+function isMixedArray(value: unknown): value is "mixed" {
+  return value === "mixed";
+}
+
+function isPaintArray(
+  value: SerializedPaint[] | "mixed" | undefined,
+): value is SerializedPaint[] {
+  return Array.isArray(value);
+}
+
 function collectImageHashes(node: SerializedNode): string[] {
   const hashes = new Set<string>();
   const traverse = (n: SerializedNode) => {
-    if (n.styles?.fills) {
+    if (n.styles?.fills && isPaintArray(n.styles.fills)) {
       for (const fill of n.styles.fills) {
         if (fill.type === "IMAGE" && fill.imageHash) {
           hashes.add(fill.imageHash);
         }
       }
     }
-    if (n.styles?.strokes) {
+    if (n.styles?.strokes && isPaintArray(n.styles.strokes)) {
       for (const stroke of n.styles.strokes) {
         if (stroke.type === "IMAGE" && stroke.imageHash) {
           hashes.add(stroke.imageHash);
@@ -471,12 +753,12 @@ function enrichNodeWithImageData(
     }
   };
 
-  if (node.styles?.fills) {
+  if (node.styles?.fills && isPaintArray(node.styles.fills)) {
     for (const fill of node.styles.fills) {
       applyToPaint(fill);
     }
   }
-  if (node.styles?.strokes) {
+  if (node.styles?.strokes && isPaintArray(node.styles.strokes)) {
     for (const stroke of node.styles.strokes) {
       applyToPaint(stroke);
     }

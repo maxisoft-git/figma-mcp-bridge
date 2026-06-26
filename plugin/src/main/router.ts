@@ -50,6 +50,11 @@ import { handle as create_effect_style } from "./handlers/create_effect_style";
 import { handle as create_grid_style } from "./handlers/create_grid_style";
 import { handle as create_variable_collection } from "./handlers/create_variable_collection";
 import { handle as create_variable } from "./handlers/create_variable";
+import { handle as get_dev_css } from "./handlers/get_dev_css";
+import { handle as get_dev_svg } from "./handlers/get_dev_svg";
+import { handle as get_dev_html } from "./handlers/get_dev_html";
+import { handle as get_dev_json } from "./handlers/get_dev_json";
+import { handle as get_dev_image } from "./handlers/get_dev_image";
 
 type Handler = (request: ServerRequest) => Promise<PluginResponse>;
 
@@ -104,6 +109,11 @@ const handlers: Record<RequestType, Handler> = {
   create_grid_style,
   create_variable_collection,
   create_variable,
+  get_dev_css,
+  get_dev_svg,
+  get_dev_html,
+  get_dev_json,
+  get_dev_image,
 };
 
 export const dispatch = async (
