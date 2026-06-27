@@ -716,6 +716,161 @@ export function registerTools(server: McpServer, node: Node, port: number): void
       );
     }
   );
+
+  // ---- Workflow tools ----
+  server.tool(
+    "bulk_rename",
+    "Bulk rename nodes in a subtree using a RegEx pattern. Useful for cleaning up auto-generated names (e.g. /^Frame \\d+$/ → 'Frame'). Returns { matched, renamed, samples }.",
+    toolInputSchemas.bulk_rename.shape,
+    async ({ fileKey, ...params }): Promise<ToolResult> => {
+      return renderResponse(() =>
+        node.sendWithParams("bulk_rename", undefined, params, fileKey)
+      );
+    }
+  );
+
+  server.tool(
+    "normalize_spacing",
+    "Normalize spacing values across auto-layout frames in the given nodes. Strategy: 'grid' (4px step), 'manifest' (snap to values in a design system), 'semantic' (Tailwind scale). Returns diffs and applies unless dryRun=true.",
+    toolInputSchemas.normalize_spacing.shape,
+    async ({ fileKey, ...params }): Promise<ToolResult> => {
+      return renderResponse(() =>
+        node.sendWithParams("normalize_spacing", undefined, params, fileKey)
+      );
+    }
+  );
+
+  server.tool(
+    "switch_theme",
+    "Switch variable modes (light/dark) for all bound variables on the given nodes. If manifestId is provided, the manifest's collection is also switched.",
+    toolInputSchemas.switch_theme.shape,
+    async ({ fileKey, ...params }): Promise<ToolResult> => {
+      return renderResponse(() =>
+        node.sendWithParams("switch_theme", undefined, params, fileKey)
+      );
+    }
+  );
+
+  server.tool(
+    "update_component_instances",
+    "Mass-update overrides on instances of a master component. Override keys: 'text:<name>', 'fill:<name>', 'opacity:<name>', 'rotation:<name>', 'visible:<name>', or just '<name>' (defaults to text).",
+    toolInputSchemas.update_component_instances.shape,
+    async ({ fileKey, ...params }): Promise<ToolResult> => {
+      return renderResponse(() =>
+        node.sendWithParams("update_component_instances", undefined, params, fileKey)
+      );
+    }
+  );
+
+  server.tool(
+    "normalize_layers",
+    "Clean up a subtree: rename 'Frame N' → 'Frame' and flatten single-child frame wrappers. Reports actions and supports dry-run.",
+    toolInputSchemas.normalize_layers.shape,
+    async ({ fileKey, ...params }): Promise<ToolResult> => {
+      return renderResponse(() =>
+        node.sendWithParams("normalize_layers", undefined, params, fileKey)
+      );
+    }
+  );
+
+  server.tool(
+    "lint_styles",
+    "Lint a subtree against design system rules. Flags hardcoded colors, off-grid spacing, etc. With fix=true, attempts to rebind violations to manifest variables.",
+    toolInputSchemas.lint_styles.shape,
+    async ({ fileKey, ...params }): Promise<ToolResult> => {
+      return renderResponse(() =>
+        node.sendWithParams("lint_styles", undefined, params, fileKey)
+      );
+    }
+  );
+
+  server.tool(
+    "generate_component_from_description",
+    "Create a Figma component from a structured description. Supports nested text/frame/rect children. Optional manifest to bind styles.",
+    toolInputSchemas.generate_component_from_description.shape,
+    async ({ fileKey, ...params }): Promise<ToolResult> => {
+      return renderResponse(() =>
+        node.sendWithParams("generate_component_from_description", undefined, params, fileKey)
+      );
+    }
+  );
+
+  server.tool(
+    "analyze_node_against_design",
+    "Render preview(s) of the given nodes and list deviations from the given manifest (hardcoded colors, off-grid spacing). Returns { previews, deviations }.",
+    toolInputSchemas.analyze_node_against_design.shape,
+    async ({ fileKey, ...params }): Promise<ToolResult> => {
+      return renderResponse(() =>
+        node.sendWithParams("analyze_node_against_design", undefined, params, fileKey)
+      );
+    }
+  );
+
+  server.tool(
+    "apply_aria_labels",
+    "Apply accessible names to interactive nodes in a subtree. Figma uses node.name as the a11y label proxy. mode='auto' uses text content; 'from-name' uses node name; 'clear' empties labels.",
+    toolInputSchemas.apply_aria_labels.shape,
+    async ({ fileKey, ...params }): Promise<ToolResult> => {
+      return renderResponse(() =>
+        node.sendWithParams("apply_aria_labels", undefined, params, fileKey)
+      );
+    }
+  );
+
+  server.tool(
+    "manage_snapshots",
+    "Create, list, restore, or delete node state snapshots. Snapshots auto-expire after 10 minutes and are capped at 32.",
+    toolInputSchemas.manage_snapshots.shape,
+    async ({ fileKey, ...params }): Promise<ToolResult> => {
+      return renderResponse(() =>
+        node.sendWithParams("manage_snapshots", undefined, params, fileKey)
+      );
+    }
+  );
+
+  server.tool(
+    "diff_layouts",
+    "Diff two frames' auto-layout properties (and child structure if recurse=true). Returns a list of changes.",
+    toolInputSchemas.diff_layouts.shape,
+    async ({ fileKey, ...params }): Promise<ToolResult> => {
+      return renderResponse(() =>
+        node.sendWithParams("diff_layouts", undefined, params, fileKey)
+      );
+    }
+  );
+
+  server.tool(
+    "go_to_node",
+    "Set Figma's current selection to the given node. Helps AI agents ground the user's UI in the right context.",
+    toolInputSchemas.go_to_node.shape,
+    async ({ fileKey, ...params }): Promise<ToolResult> => {
+      return renderResponse(() =>
+        node.sendWithParams("go_to_node", undefined, params, fileKey)
+      );
+    }
+  );
+
+  server.tool(
+    "get_selection_chain",
+    "Return the breadcrumb of names from the current selection up to the page root.",
+    toolInputSchemas.get_selection_chain.shape,
+    async ({ fileKey }): Promise<ToolResult> => {
+      return renderResponse(() =>
+        node.sendWithParams("get_selection_chain", undefined, {}, fileKey)
+      );
+    }
+  );
+
+  server.tool(
+    "set_z_index_strategy",
+    "Move the given nodes to front/back of their parent, or forward/backward by one step. Useful for layer order fixes.",
+    toolInputSchemas.set_z_index_strategy.shape,
+    async ({ fileKey, ...params }): Promise<ToolResult> => {
+      return renderResponse(() =>
+        node.sendWithParams("set_z_index_strategy", undefined, params, fileKey)
+      );
+    }
+  );
 }
 
 export async function executeSaveScreenshots(

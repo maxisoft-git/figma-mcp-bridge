@@ -708,6 +708,137 @@ export const toolInputSchemas = {
   }).describe(
     "List all stored design system manifests, or delete a specific one. Manifests are persisted to ~/.figma-mcp-bridge/manifests/ and survive plugin restarts."
   ),
+
+  // Workflow tools
+  bulk_rename: z.object({
+    nodeIds: z.array(figmaNodeId).min(1).describe("Root node(s) to start from."),
+    pattern: z.string().min(1).describe("RegEx pattern (JS syntax) to match against node.name."),
+    replacement: z.string().describe("Replacement string. May use $1, $2, … for capture groups."),
+    matchOnly: z.boolean().optional().describe("When true, only count matches without writing (default true if dryRun)."),
+    scope: z.enum(["all", "children"]).optional().describe("'all' walks whole subtree; 'children' stops at first level. Default 'all'."),
+    dryRun: z.boolean().optional().describe("When true, count matches but do not write. Default false."),
+    fileKey: fileKeyField,
+  }).describe(
+    "Bulk rename nodes in a subtree using a RegEx pattern. Useful for cleaning up auto-generated names like 'Frame 234' → 'Card'. Returns { matched, renamed, samples }."
+  ),
+  normalize_spacing: z.object({
+    nodeIds: z.array(figmaNodeId).min(1),
+    strategy: z.enum(["grid", "manifest", "semantic"]).describe("Snap target: 'grid' (4px step), 'manifest' (snap to values in the given manifest), 'semantic' (snap to Tailwind-style semantic scale)."),
+    gridStep: z.number().optional().describe("Step size for 'grid' strategy. Default 4."),
+    tolerance: z.number().optional().describe("Max snap distance in px. Default 2."),
+    manifestId: z.string().optional().describe("Required for 'manifest' / 'semantic' strategies."),
+    dryRun: z.boolean().optional().describe("Default false."),
+    fileKey: fileKeyField,
+  }).describe(
+    "Normalize spacing values across auto-layout frames in the given nodes. Enforces design grid compliance."
+  ),
+  switch_theme: z.object({
+    nodeIds: z.array(figmaNodeId).min(1),
+    mode: z.enum(["light", "dark"]),
+    manifestId: z.string().optional().describe("Optional manifest whose collection mode to switch."),
+    fileKey: fileKeyField,
+  }).describe(
+    "Switch variable modes (light/dark) for all bound variables on the given nodes. Useful for theming previews."
+  ),
+  update_component_instances: z.object({
+    masterId: figmaNodeId.describe("Master component id."),
+    overrides: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])).describe("Map of override key (e.g. 'Submit Button', 'fill:Submit Button', 'text:Title') → new value."),
+    instanceIds: z.array(figmaNodeId).optional().describe("Optional explicit list of instance ids. If empty, all instances of masterId on current page."),
+    dryRun: z.boolean().optional(),
+    fileKey: fileKeyField,
+  }).describe(
+    "Mass-update overrides on instances of a master component. Override keys: 'text:<name>', 'fill:<name>', 'opacity:<name>', 'rotation:<name>', 'visible:<name>', or just '<name>' (defaults to text)."
+  ),
+  normalize_layers: z.object({
+    nodeIds: z.array(figmaNodeId).min(1),
+    renameAnonymous: z.boolean().optional().describe("Rename 'Frame 234' → 'Frame'. Default true."),
+    flattenRedundant: z.boolean().optional().describe("Flatten single-child frame wrappers. Default true."),
+    dryRun: z.boolean().optional().describe("Default false."),
+    fileKey: fileKeyField,
+  }).describe(
+    "Clean up a subtree: rename anonymous frames, flatten redundant wrappers. Reports actions and supports dry-run."
+  ),
+  lint_styles: z.object({
+    nodeIds: z.array(figmaNodeId).min(1),
+    manifestId: z.string().optional().describe("Optional manifest to compare against."),
+    fix: z.boolean().optional().describe("When true, attempt to rebind hardcoded values to manifest variables. Default false."),
+    rules: z.object({
+      paletteOnly: z.boolean().optional(),
+      spacingFromManifest: z.boolean().optional(),
+      noHardcodedColors: z.boolean().optional(),
+    }).optional().describe("Subset of rules to enable."),
+    fileKey: fileKeyField,
+  }).describe(
+    "Lint a subtree against design system rules. Flags hardcoded colors, off-grid spacing, etc. With fix=true, attempts to rebind violations to manifest variables."
+  ),
+  generate_component_from_description: z.object({
+    parentId: figmaNodeId.describe("Where the new component will be created."),
+    name: z.string().min(1).describe("Component name."),
+    layoutMode: z.enum(["VERTICAL", "HORIZONTAL"]).describe("Outer auto-layout direction."),
+    children: z.array(z.object({
+      type: z.enum(["text", "frame", "rect"]),
+    }).passthrough()).describe("Recursive children descriptors."),
+    manifestId: z.string().optional().describe("Optional manifest to bind styles to."),
+    background: z.string().optional().describe("Background fill (hex)."),
+    padding: z.number().optional().describe("Outer padding. Default 16."),
+    itemSpacing: z.number().optional().describe("Item spacing. Default 8."),
+    cornerRadius: z.number().optional().describe("Corner radius. Default 8."),
+    fileKey: fileKeyField,
+  }).describe(
+    "Create a Figma component from a structured description. Supports nested text/frame/rect children. Optional manifest to bind styles."
+  ),
+  analyze_node_against_design: z.object({
+    nodeIds: z.array(figmaNodeId).min(1),
+    manifestId: z.string().optional().describe("Manifest to compare against."),
+    maxWidth: z.number().optional().describe("Preview width. Default 800."),
+    fileKey: fileKeyField,
+  }).describe(
+    "Render preview(s) of the given nodes and list deviations from the given manifest (hardcoded colors, off-grid spacing). Returns { previews, deviations }."
+  ),
+  apply_aria_labels: z.object({
+    nodeIds: z.array(figmaNodeId).min(1),
+    mode: z.enum(["auto", "from-name", "clear"]).optional().describe("'auto' generates from text content; 'from-name' uses node name; 'clear' empties labels. Default 'auto'."),
+    overrides: z.record(z.string(), z.string()).optional().describe("Manual overrides: { '<node-name>': '<aria-label>' }."),
+    dryRun: z.boolean().optional(),
+    fileKey: fileKeyField,
+  }).describe(
+    "Apply accessible names to interactive nodes in a subtree. Figma uses node.name as the a11y label proxy."
+  ),
+  manage_snapshots: z.object({
+    mode: z.enum(["create", "restore", "list", "delete"]).describe("Operation."),
+    nodeIds: z.array(figmaNodeId).min(1).optional().describe("Required for mode='create'."),
+    snapshotId: z.string().optional().describe("Required for mode='restore' / 'delete'."),
+    fileKey: fileKeyField,
+  }).describe(
+    "Create, list, restore, or delete node state snapshots. Snapshots auto-expire after 10 minutes and are capped at 32."
+  ),
+  diff_layouts: z.object({
+    nodeIdA: figmaNodeId,
+    nodeIdB: figmaNodeId,
+    recurse: z.boolean().optional().describe("Recurse into children that share the same name. Default true."),
+    fileKey: fileKeyField,
+  }).describe(
+    "Diff two frames' auto-layout properties (and child structure if recurse=true). Returns a list of changes."
+  ),
+  go_to_node: z.object({
+    nodeIds: z.array(figmaNodeId).min(1).describe("First element becomes the selection."),
+    fileKey: fileKeyField,
+  }).describe(
+    "Set Figma's current selection to the given node. Helps AI agents ground the user's UI in the right context."
+  ),
+  get_selection_chain: z.object({
+    fileKey: fileKeyField,
+  }).describe(
+    "Return the breadcrumb of names from the current selection up to the page root."
+  ),
+  set_z_index_strategy: z.object({
+    nodeIds: z.array(figmaNodeId).min(1),
+    strategy: z.enum(["dom", "stack"]).describe("'dom' changes parent.insertChild order; 'stack' is a no-op for now."),
+    position: z.enum(["front", "back", "forward", "backward"]).optional().describe("For 'dom' strategy. Default 'front'."),
+    fileKey: fileKeyField,
+  }).describe(
+    "Move the given nodes to front/back of their parent, or forward/backward by one step. Useful for layer order fixes."
+  ),
 } as const;
 
 type ToolName = keyof typeof toolInputSchemas;
@@ -768,6 +899,20 @@ const rpcToArgs: Record<
   create_styles_table: (_nodeIds, params) => params,
   apply_design_system: (nodeIds, params) => ({ nodeIds, ...params }),
   manage_manifests: (_nodeIds, params) => params,
+  bulk_rename: (nodeIds, params) => ({ nodeIds, ...params }),
+  normalize_spacing: (nodeIds, params) => ({ nodeIds, ...params }),
+  switch_theme: (nodeIds, params) => ({ nodeIds, ...params }),
+  update_component_instances: (nodeIds, params) => ({ masterId: nodeIds?.[0], ...params }),
+  normalize_layers: (nodeIds, params) => ({ nodeIds, ...params }),
+  lint_styles: (nodeIds, params) => ({ nodeIds, ...params }),
+  generate_component_from_description: (_nodeIds, params) => params,
+  analyze_node_against_design: (nodeIds, params) => ({ nodeIds, ...params }),
+  apply_aria_labels: (nodeIds, params) => ({ nodeIds, ...params }),
+  manage_snapshots: (_nodeIds, params) => params,
+  diff_layouts: (nodeIds, params) => ({ nodeIdA: nodeIds?.[0], ...params }),
+  go_to_node: (nodeIds, params) => ({ nodeIds, ...params }),
+  get_selection_chain: (_nodeIds, _params) => ({}),
+  set_z_index_strategy: (nodeIds, params) => ({ nodeIds, ...params }),
 };
 
 /**

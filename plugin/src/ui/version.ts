@@ -7,4 +7,4 @@
  *
  * Keep in sync with `package.json` and `src/main/version.ts`.
  */
-export const PLUGIN_VERSION = "0.7.0";
+export const PLUGIN_VERSION = "0.8.0";

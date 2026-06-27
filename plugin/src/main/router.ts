@@ -60,6 +60,20 @@ import { handle as extract_design_system_bulk } from "./handlers/extract_design_
 import { handle as create_styles_table } from "./handlers/create_styles_table";
 import { handle as apply_design_system } from "./handlers/apply_design_system";
 import { handle as manage_manifests } from "./handlers/manage_manifests";
+import { handle as bulk_rename } from "./handlers/bulk_rename";
+import { handle as normalize_spacing } from "./handlers/normalize_spacing";
+import { handle as switch_theme } from "./handlers/switch_theme";
+import { handle as update_component_instances } from "./handlers/update_component_instances";
+import { handle as normalize_layers } from "./handlers/normalize_layers";
+import { handle as lint_styles } from "./handlers/lint_styles";
+import { handle as generate_component_from_description } from "./handlers/generate_component_from_description";
+import { handle as analyze_node_against_design } from "./handlers/analyze_node_against_design";
+import { handle as apply_aria_labels } from "./handlers/apply_aria_labels";
+import { handle as manage_snapshots } from "./handlers/manage_snapshots";
+import { handle as diff_layouts } from "./handlers/diff_layouts";
+import { handle as go_to_node } from "./handlers/go_to_node";
+import { handle as get_selection_chain } from "./handlers/get_selection_chain";
+import { handle as set_z_index_strategy } from "./handlers/set_z_index_strategy";
 
 type Handler = (request: ServerRequest) => Promise<PluginResponse>;
 
@@ -124,6 +138,20 @@ const handlers: Record<RequestType, Handler> = {
   create_styles_table,
   apply_design_system,
   manage_manifests,
+  bulk_rename,
+  normalize_spacing,
+  switch_theme,
+  update_component_instances,
+  normalize_layers,
+  lint_styles,
+  generate_component_from_description,
+  analyze_node_against_design,
+  apply_aria_labels,
+  manage_snapshots,
+  diff_layouts,
+  go_to_node,
+  get_selection_chain,
+  set_z_index_strategy,
 };
 
 export const dispatch = async (

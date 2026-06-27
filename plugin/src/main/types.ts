@@ -58,7 +58,21 @@ export type RequestType =
   | "extract_design_system_bulk"
   | "create_styles_table"
   | "apply_design_system"
-  | "manage_manifests";
+  | "manage_manifests"
+  | "bulk_rename"
+  | "normalize_spacing"
+  | "switch_theme"
+  | "update_component_instances"
+  | "normalize_layers"
+  | "lint_styles"
+  | "generate_component_from_description"
+  | "analyze_node_against_design"
+  | "apply_aria_labels"
+  | "manage_snapshots"
+  | "diff_layouts"
+  | "go_to_node"
+  | "get_selection_chain"
+  | "set_z_index_strategy";
 
 export type ServerRequest = {
   type: RequestType;
