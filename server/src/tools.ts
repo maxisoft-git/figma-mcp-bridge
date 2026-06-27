@@ -960,6 +960,73 @@ export function registerTools(server: McpServer, node: Node, port: number): void
       );
     }
   );
+
+  // ---- Tier 2/3 ----
+  server.tool(
+    "apply_style_preset",
+    "Create a Variable collection from a built-in or custom design system preset (iOS, Android, Material, Fluent). Optionally bind the resulting variables to the given nodes (fills, spacing, radius).",
+    toolInputSchemas.apply_style_preset.shape,
+    async ({ fileKey, ...params }): Promise<ToolResult> => {
+      return renderResponse(() =>
+        node.sendWithParams("apply_style_preset", undefined, params, fileKey)
+      );
+    }
+  );
+
+  server.tool(
+    "create_design_token_alias",
+    "Create a new alias variable that points to an existing one. Useful for semantic naming (e.g. 'surface' → 'color/neutral-50').",
+    toolInputSchemas.create_design_token_alias.shape,
+    async ({ fileKey, ...params }): Promise<ToolResult> => {
+      return renderResponse(() =>
+        node.sendWithParams("create_design_token_alias", undefined, params, fileKey)
+      );
+    }
+  );
+
+  server.tool(
+    "bulk_swap_text",
+    "Bulk replace text inside TEXT nodes in a subtree. Supports literal substring or RegEx replacement with capture groups.",
+    toolInputSchemas.bulk_swap_text.shape,
+    async ({ fileKey, ...params }): Promise<ToolResult> => {
+      return renderResponse(() =>
+        node.sendWithParams("bulk_swap_text", undefined, params, fileKey)
+      );
+    }
+  );
+
+  server.tool(
+    "set_node_metadata",
+    "Store JSON metadata on a node via setSharedPluginData. Used for AI annotations, build IDs, design-version tags.",
+    toolInputSchemas.set_node_metadata.shape,
+    async ({ fileKey, ...params }): Promise<ToolResult> => {
+      return renderResponse(() =>
+        node.sendWithParams("set_node_metadata", undefined, params, fileKey)
+      );
+    }
+  );
+
+  server.tool(
+    "get_node_metadata",
+    "Read metadata stored by set_node_metadata.",
+    toolInputSchemas.get_node_metadata.shape,
+    async ({ fileKey, ...params }): Promise<ToolResult> => {
+      return renderResponse(() =>
+        node.sendWithParams("get_node_metadata", undefined, params, fileKey)
+      );
+    }
+  );
+
+  server.tool(
+    "figma_inspect",
+    "Mirror of Figma's Dev Mode Inspect panel: full box model, constraints, typography, fills/strokes/effects with bound variables, layout subtree, component binding.",
+    toolInputSchemas.figma_inspect.shape,
+    async ({ fileKey, ...params }): Promise<ToolResult> => {
+      return renderResponse(() =>
+        node.sendWithParams("figma_inspect", undefined, params, fileKey)
+      );
+    }
+  );
 }
 
 export async function executeSaveScreenshots(

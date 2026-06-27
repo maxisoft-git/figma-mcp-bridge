@@ -80,7 +80,13 @@ export type RequestType =
   | "get_layout_measurements"
   | "visualize_layout"
   | "get_constraints"
-  | "get_component_variants";
+  | "get_component_variants"
+  | "apply_style_preset"
+  | "create_design_token_alias"
+  | "bulk_swap_text"
+  | "set_node_metadata"
+  | "get_node_metadata"
+  | "figma_inspect";
 
 export type ServerRequest = {
   type: RequestType;

@@ -82,6 +82,11 @@ import { handle as get_layout_measurements } from "./handlers/get_layout_measure
 import { handle as visualize_layout } from "./handlers/visualize_layout";
 import { handle as get_constraints } from "./handlers/get_constraints";
 import { handle as get_component_variants } from "./handlers/get_component_variants";
+import { handle as apply_style_preset } from "./handlers/apply_style_preset";
+import { handle as create_design_token_alias } from "./handlers/create_design_token_alias";
+import { handle as bulk_swap_text } from "./handlers/bulk_swap_text";
+import { handleSet as set_node_metadata, handleGet as get_node_metadata } from "./handlers/node_metadata";
+import { handle as figma_inspect } from "./handlers/figma_inspect";
 
 type Handler = (request: ServerRequest) => Promise<PluginResponse>;
 
@@ -168,6 +173,12 @@ const handlers: Record<RequestType, Handler> = {
   visualize_layout,
   get_constraints,
   get_component_variants,
+  apply_style_preset,
+  create_design_token_alias,
+  bulk_swap_text,
+  set_node_metadata,
+  get_node_metadata,
+  figma_inspect,
 };
 
 export const dispatch = async (

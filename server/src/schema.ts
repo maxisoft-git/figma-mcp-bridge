@@ -913,6 +913,64 @@ export const toolInputSchemas = {
   }).describe(
     "Inspect a component's variants: property definitions and each variant's resolved property values."
   ),
+
+  // Tier 2/3 — presets, alias, bulk-swap, metadata, full inspect
+  apply_style_preset: z.object({
+    nodeIds: z.array(figmaNodeId).min(1),
+    preset: z.enum(["ios", "android", "material", "fluent", "custom"]),
+    customTokens: z.array(z.object({
+      name: z.string().min(1),
+      type: z.enum(["COLOR", "FLOAT", "STRING"]),
+      value: z.union([z.number(), z.string(), z.object({ r: z.number(), g: z.number(), b: z.number(), a: z.number().optional() })]),
+    })).optional().describe("Required when preset='custom'."),
+    collectionName: z.string().optional().describe("Variable collection name. Default '<preset>-design-system'."),
+    applyToNodes: z.boolean().optional().describe("Auto-apply generated variables to the given nodes. Default true."),
+    fileKey: fileKeyField,
+  }).describe(
+    "Create a Variable collection from a built-in or custom design system preset (iOS, Android, Material, Fluent). Optionally bind the resulting variables to the given nodes."
+  ),
+  create_design_token_alias: z.object({
+    name: z.string().min(1).describe("Alias variable name (e.g. 'color/primary/500')."),
+    targetVariableId: z.string().describe("Existing variable to alias."),
+    type: z.enum(["COLOR", "FLOAT", "STRING", "BOOLEAN"]).optional().describe("Type override. Default: target's type."),
+    collectionId: z.string().optional().describe("Collection override. Default: target's collection."),
+    fileKey: fileKeyField,
+  }).describe(
+    "Create a new alias variable that points to an existing one. Useful for semantic naming (e.g. 'surface' → 'color/neutral-50')."
+  ),
+  bulk_swap_text: z.object({
+    nodeIds: z.array(figmaNodeId).min(1),
+    find: z.string().min(1).describe("Substring or RegEx pattern to find."),
+    replace: z.string().describe("Replacement string. RegEx capture groups $1, $2, etc. supported."),
+    regex: z.boolean().optional().describe("If true, 'find' is treated as a JS RegEx. Default false (literal substring)."),
+    caseInsensitive: z.boolean().optional().describe("Default true."),
+    dryRun: z.boolean().optional().describe("If true, only count matches. Default false."),
+    fileKey: fileKeyField,
+  }).describe(
+    "Bulk replace text inside TEXT nodes in a subtree. Useful for renaming copy across screens after a refactor."
+  ),
+  set_node_metadata: z.object({
+    nodeIds: z.array(figmaNodeId).min(1),
+    key: z.string().min(1).describe("Metadata key. Use a unique namespace per use case."),
+    value: z.unknown().describe("JSON-serializable value to store. Will be JSON.stringify'd."),
+    fileKey: fileKeyField,
+  }).describe(
+    "Store JSON metadata on a node via setSharedPluginData. Used for AI annotations, build IDs, design-version tags."
+  ),
+  get_node_metadata: z.object({
+    nodeIds: z.array(figmaNodeId).min(1),
+    key: z.string().min(1).describe("Metadata key to read."),
+    fileKey: fileKeyField,
+  }).describe(
+    "Read metadata stored by set_node_metadata."
+  ),
+  figma_inspect: z.object({
+    nodeIds: z.array(figmaNodeId).min(1),
+    includeLayoutTree: z.boolean().optional().describe("Include the full layout subtree. Default true (1 level deep)."),
+    fileKey: fileKeyField,
+  }).describe(
+    "Mirror of Figma's Dev Mode Inspect panel: full box model, constraints, typography, fills/strokes/effects with bound variables, layout subtree, component binding."
+  ),
 } as const;
 
 type ToolName = keyof typeof toolInputSchemas;
@@ -995,6 +1053,12 @@ const rpcToArgs: Record<
   visualize_layout: (_nodeIds, params) => params,
   get_constraints: (nodeIds, params) => ({ nodeIds, ...params }),
   get_component_variants: (_nodeIds, params) => params,
+  apply_style_preset: (nodeIds, params) => ({ nodeIds, ...params }),
+  create_design_token_alias: (_nodeIds, params) => params,
+  bulk_swap_text: (nodeIds, params) => ({ nodeIds, ...params }),
+  set_node_metadata: (nodeIds, params) => ({ nodeIds, ...params }),
+  get_node_metadata: (nodeIds, params) => ({ nodeIds, ...params }),
+  figma_inspect: (nodeIds, params) => ({ nodeIds, ...params }),
 };
 
 /**
