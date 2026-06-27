@@ -72,7 +72,15 @@ export type RequestType =
   | "diff_layouts"
   | "go_to_node"
   | "get_selection_chain"
-  | "set_z_index_strategy";
+  | "set_z_index_strategy"
+  | "inspect_node"
+  | "generate_code"
+  | "inspect_variables"
+  | "get_set_property_value"
+  | "get_layout_measurements"
+  | "visualize_layout"
+  | "get_constraints"
+  | "get_component_variants";
 
 export type ServerRequest = {
   type: RequestType;

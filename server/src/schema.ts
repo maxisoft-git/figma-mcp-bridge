@@ -839,6 +839,80 @@ export const toolInputSchemas = {
   }).describe(
     "Move the given nodes to front/back of their parent, or forward/backward by one step. Useful for layer order fixes."
   ),
+
+  // Dev Mode parity — inspect, code-gen, variables, measurements
+  inspect_node: z.object({
+    nodeIds: z.array(figmaNodeId).min(1),
+    recurse: z.boolean().optional().describe("Recurse into children. Default false."),
+    includeVariables: z.boolean().optional().describe("Include bound variables. Default true."),
+    maxDepth: z.number().int().min(1).max(5).optional().describe("Max depth for recurse. Default 1."),
+    fileKey: fileKeyField,
+  }).describe(
+    "Inspect a node: box model (x/y/width/height/margin/padding/corner-radius), constraints, typography (for TEXT), fills/strokes/effects with bound variables, and warnings. Use recurse=true to walk a subtree."
+  ),
+  generate_code: z.object({
+    nodeId: figmaNodeId,
+    framework: z.enum(["react-tailwind", "react-css", "vue", "html", "css", "scss"]).describe("Target framework."),
+    component: z.string().optional().describe("Component name override. Default: derived from node name."),
+    useVariables: z.boolean().optional().describe("Emit CSS variables instead of hardcoded values. Default false."),
+    stylesOnly: z.boolean().optional().describe("Return only the CSS/SCSS file. Default false."),
+    fileKey: fileKeyField,
+  }).describe(
+    "Generate code (JSX/HTML/template + CSS) for a Figma node. Supports React+Tailwind, React+CSS, Vue SFC, plain HTML, and CSS/SCSS."
+  ),
+  inspect_variables: z.object({
+    mode: z.enum(["list", "get", "set", "alias"]).describe("Operation: list variables; get a collection; set a variable's value; create a variable alias."),
+    nameFilter: z.string().optional().describe("For mode='list'. Substring filter on variable name."),
+    type: z.enum(["COLOR", "FLOAT", "STRING", "BOOLEAN"]).optional().describe("For mode='list'. Type filter."),
+    limit: z.number().int().min(1).max(2000).optional().describe("For mode='list'. Default 200."),
+    collectionId: z.string().optional().describe("For mode='get'. Collection id."),
+    modeId: z.string().optional().describe("For mode='get' (default mode) or 'set' (target mode)."),
+    variableId: z.string().optional().describe("For mode='set' / 'alias'."),
+    value: z.union([z.number(), z.string(), z.boolean(), z.object({ r: z.number(), g: z.number(), b: z.number(), a: z.number().optional() })]).optional().describe("For mode='set'."),
+    targetVariableId: z.string().optional().describe("For mode='alias'. The variable the new one will alias."),
+    name: z.string().optional().describe("For mode='alias'. New variable name."),
+    fileKey: fileKeyField,
+  }).describe(
+    "Inspect / get / set / alias design variables. Single tool covering common Variable workflow."
+  ),
+  get_set_property_value: z.object({
+    nodeIds: z.array(figmaNodeId).min(1),
+    property: z.string().describe("Property name: 'fill' | 'width' | 'height' | 'rotation' | 'opacity' | 'cornerRadius' | 'paddingTop' | 'characters' | etc."),
+    value: z.union([z.number(), z.string(), z.boolean(), z.object({ r: z.number(), g: z.number(), b: z.number(), a: z.number().optional() })]).optional().describe("For mode='set'."),
+    includeVariable: z.boolean().optional().describe("For mode='get'. Include bound variable id. Default true."),
+    dryRun: z.boolean().optional().describe("For mode='set'. Default false."),
+    fileKey: fileKeyField,
+  }).describe(
+    "Read or write a single property on one or more nodes. mode='get' (default) reads; pass value to set. Useful for atomic operations (e.g. set fill on 100 frames at once)."
+  ),
+  get_layout_measurements: z.object({
+    nodeId: figmaNodeId,
+    recurse: z.boolean().optional().describe("Recurse into children. Default true."),
+    maxDepth: z.number().int().min(1).max(8).optional().describe("Max depth. Default 4."),
+    fileKey: fileKeyField,
+  }).describe(
+    "Get auto-layout measurements for a frame and (optionally) its subtree: padding, spacing, sizing modes, alignment, layout grow/align. Includes overflow warnings."
+  ),
+  visualize_layout: z.object({
+    nodeId: figmaNodeId,
+    recurse: z.boolean().optional().describe("Recurse into children. Default true."),
+    maxDepth: z.number().int().min(1).max(8).optional().describe("Max depth. Default 3."),
+    fileKey: fileKeyField,
+  }).describe(
+    "Return an ASCII tree visualization of an auto-layout structure. Useful for understanding complex nested layouts without rendering screenshots."
+  ),
+  get_constraints: z.object({
+    nodeIds: z.array(figmaNodeId).min(1).describe("Nodes to read constraints from."),
+    fileKey: fileKeyField,
+  }).describe(
+    "Get resize constraints (horizontal/vertical MIN/MAX/STRETCH/SCALE/CENTER) and layout grow/align for the given nodes."
+  ),
+  get_component_variants: z.object({
+    componentId: figmaNodeId.describe("Master component id."),
+    fileKey: fileKeyField,
+  }).describe(
+    "Inspect a component's variants: property definitions and each variant's resolved property values."
+  ),
 } as const;
 
 type ToolName = keyof typeof toolInputSchemas;
@@ -913,6 +987,14 @@ const rpcToArgs: Record<
   go_to_node: (nodeIds, params) => ({ nodeIds, ...params }),
   get_selection_chain: (_nodeIds, _params) => ({}),
   set_z_index_strategy: (nodeIds, params) => ({ nodeIds, ...params }),
+  inspect_node: (nodeIds, params) => ({ nodeIds, ...params }),
+  generate_code: (_nodeIds, params) => params,
+  inspect_variables: (_nodeIds, params) => params,
+  get_set_property_value: (nodeIds, params) => ({ nodeIds, ...params }),
+  get_layout_measurements: (_nodeIds, params) => params,
+  visualize_layout: (_nodeIds, params) => params,
+  get_constraints: (nodeIds, params) => ({ nodeIds, ...params }),
+  get_component_variants: (_nodeIds, params) => params,
 };
 
 /**

@@ -871,6 +871,95 @@ export function registerTools(server: McpServer, node: Node, port: number): void
       );
     }
   );
+
+  // ---- Dev Mode parity ----
+  server.tool(
+    "inspect_node",
+    "Inspect a node: box model, constraints, typography, fills/strokes/effects with bound variables, and warnings. Set recurse=true to walk a subtree with overflow detection.",
+    toolInputSchemas.inspect_node.shape,
+    async ({ fileKey, ...params }): Promise<ToolResult> => {
+      return renderResponse(() =>
+        node.sendWithParams("inspect_node", undefined, params, fileKey)
+      );
+    }
+  );
+
+  server.tool(
+    "generate_code",
+    "Generate code for a Figma node. Frameworks: react-tailwind, react-css, vue, html, css, scss. Returns { html, css, dependencies }.",
+    toolInputSchemas.generate_code.shape,
+    async ({ fileKey, ...params }): Promise<ToolResult> => {
+      return renderResponse(() =>
+        node.sendWithParams("generate_code", undefined, params, fileKey)
+      );
+    }
+  );
+
+  server.tool(
+    "inspect_variables",
+    "Inspect/get/set/alias design variables. mode=list (with filters), get (collection+vars+values), set (one value), alias (create alias variable).",
+    toolInputSchemas.inspect_variables.shape,
+    async ({ fileKey, ...params }): Promise<ToolResult> => {
+      return renderResponse(() =>
+        node.sendWithParams("inspect_variables", undefined, params, fileKey)
+      );
+    }
+  );
+
+  server.tool(
+    "get_set_property_value",
+    "Read or write a single property on one or more nodes. Set value to write. Properties: 'fill', 'width', 'height', 'rotation', 'opacity', 'cornerRadius', 'paddingTop' etc., 'characters' (for TEXT).",
+    toolInputSchemas.get_set_property_value.shape,
+    async ({ fileKey, ...params }): Promise<ToolResult> => {
+      return renderResponse(() =>
+        node.sendWithParams("get_set_property_value", undefined, params, fileKey)
+      );
+    }
+  );
+
+  server.tool(
+    "get_layout_measurements",
+    "Get auto-layout measurements for a frame and (optionally) its subtree: padding, spacing, sizing modes, alignment, layout grow/align. Includes overflow warnings.",
+    toolInputSchemas.get_layout_measurements.shape,
+    async ({ fileKey, ...params }): Promise<ToolResult> => {
+      return renderResponse(() =>
+        node.sendWithParams("get_layout_measurements", undefined, params, fileKey)
+      );
+    }
+  );
+
+  server.tool(
+    "visualize_layout",
+    "Return an ASCII tree visualization of an auto-layout structure. Useful for understanding complex nested layouts without rendering screenshots.",
+    toolInputSchemas.visualize_layout.shape,
+    async ({ fileKey, ...params }): Promise<ToolResult> => {
+      return renderResponse(() =>
+        node.sendWithParams("visualize_layout", undefined, params, fileKey)
+      );
+    }
+  );
+
+  server.tool(
+    "get_constraints",
+    "Get resize constraints (horizontal/vertical MIN/MAX/STRETCH/SCALE/CENTER) and layout grow/align for the given nodes.",
+    toolInputSchemas.get_constraints.shape,
+    async ({ fileKey, ...params }): Promise<ToolResult> => {
+      return renderResponse(() =>
+        node.sendWithParams("get_constraints", undefined, params, fileKey)
+      );
+    }
+  );
+
+  server.tool(
+    "get_component_variants",
+    "Inspect a component's variants: property definitions and each variant's resolved property values.",
+    toolInputSchemas.get_component_variants.shape,
+    async ({ fileKey, ...params }): Promise<ToolResult> => {
+      return renderResponse(() =>
+        node.sendWithParams("get_component_variants", undefined, params, fileKey)
+      );
+    }
+  );
 }
 
 export async function executeSaveScreenshots(

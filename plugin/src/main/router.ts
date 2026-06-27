@@ -74,6 +74,14 @@ import { handle as diff_layouts } from "./handlers/diff_layouts";
 import { handle as go_to_node } from "./handlers/go_to_node";
 import { handle as get_selection_chain } from "./handlers/get_selection_chain";
 import { handle as set_z_index_strategy } from "./handlers/set_z_index_strategy";
+import { handle as inspect_node } from "./handlers/inspect_node";
+import { handle as generate_code } from "./handlers/generate_code";
+import { handle as inspect_variables } from "./handlers/inspect_variables";
+import { handle as get_set_property_value } from "./handlers/get_set_property_value";
+import { handle as get_layout_measurements } from "./handlers/get_layout_measurements";
+import { handle as visualize_layout } from "./handlers/visualize_layout";
+import { handle as get_constraints } from "./handlers/get_constraints";
+import { handle as get_component_variants } from "./handlers/get_component_variants";
 
 type Handler = (request: ServerRequest) => Promise<PluginResponse>;
 
@@ -152,6 +160,14 @@ const handlers: Record<RequestType, Handler> = {
   go_to_node,
   get_selection_chain,
   set_z_index_strategy,
+  inspect_node,
+  generate_code,
+  inspect_variables,
+  get_set_property_value,
+  get_layout_measurements,
+  visualize_layout,
+  get_constraints,
+  get_component_variants,
 };
 
 export const dispatch = async (
