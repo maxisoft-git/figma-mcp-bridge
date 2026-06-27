@@ -4,7 +4,25 @@ import type { Duplex } from "node:stream";
 import type { BridgeRequest, BridgeResponse, ConnectedFile } from "./types.js";
 import { VERSION } from "./version.js";
 
-const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS ?? "https://figma.com,https://www.figma.com,null").split(",");
+/**
+ * Allowed WebSocket origins. Default is the Figma web app only.
+ *
+ * Security notes:
+ *  - The `null` origin is what browsers/sandboxes send for `file://` URLs
+ *    and opaque contexts. It is intentionally excluded from the default
+ *    because accepting it would let any local file open a bridge socket.
+ *  - Set `ALLOWED_ORIGINS` to a comma-separated list to override.
+ *  - For local Figma desktop testing only, set
+ *    `ALLOWED_ORIGINS_INCLUDE_NULL=1` to also accept the `null` origin.
+ */
+const DEFAULT_ORIGINS = "https://figma.com,https://www.figma.com";
+const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS ?? DEFAULT_ORIGINS)
+  .split(",")
+  .map((o) => o.trim())
+  .filter(Boolean);
+if (process.env.ALLOWED_ORIGINS_INCLUDE_NULL === "1") {
+  ALLOWED_ORIGINS.push("null");
+}
 const BRIDGE_SECRET = process.env.BRIDGE_SECRET ?? "";
 
 interface PendingRequest {
@@ -33,7 +51,7 @@ export class Bridge {
     const origin = request.headers.origin;
     if (origin && !ALLOWED_ORIGINS.includes(origin)) {
       console.error(`Connection rejected: unauthorized origin "${origin}"`);
-      socket.destroy();
+      this.rejectUpgrade(socket, 403, "Forbidden: unauthorized origin");
       return;
     }
 
@@ -44,19 +62,36 @@ export class Bridge {
 
     if (!fileKey) {
       console.error("Plugin connected without fileKey, rejecting");
-      socket.destroy();
+      this.rejectUpgrade(socket, 400, "Bad Request: missing fileKey");
       return;
     }
 
     if (BRIDGE_SECRET && secret !== BRIDGE_SECRET) {
       console.error("Plugin connected with invalid secret, rejecting");
-      socket.destroy();
+      this.rejectUpgrade(socket, 403, "Forbidden: invalid secret");
       return;
     }
 
     this.wss.handleUpgrade(request, socket, head, (ws) => {
       this.handleConnection(ws, fileKey, fileName);
     });
+  }
+
+  /**
+   * Send a minimal HTTP error response before destroying the socket.
+   * Browsers/Figma surface this in dev tools, unlike a silent destroy.
+   */
+  private rejectUpgrade(socket: Duplex, status: number, message: string): void {
+    const body = JSON.stringify({ error: message });
+    socket.write(
+      `HTTP/1.1 ${status} ${message}\r\n` +
+      `Content-Type: application/json\r\n` +
+        `Content-Length: ${Buffer.byteLength(body)}\r\n` +
+        `Connection: close\r\n` +
+        `\r\n` +
+        body,
+    );
+    socket.destroy();
   }
 
   private handleConnection(ws: WebSocket, fileKey: string, fileName: string): void {

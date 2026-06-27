@@ -654,6 +654,39 @@ export const toolInputSchemas = {
   }).describe(
     "Dev Mode Mirror: extract the image from a node. Tries (1) direct imageHash, (2) imageHash on a direct child, (3) node.exportAsync(PNG) fallback. Returns base64 string + mime + source."
   ),
+
+  // Design System automation
+  extract_design_system: z.object({
+    nodeId: figmaNodeId.describe("Root node to scan recursively for colors, typography, spacing and radii."),
+    collectionName: z.string().optional().describe('Variable collection name to write into (default "Design System").'),
+    minOccurrences: z.number().int().min(1).optional().describe("Skip values that appear fewer than N times (default 1 = keep all)."),
+    skipHidden: z.boolean().optional().describe("Skip hidden nodes (default true)."),
+    fileKey: fileKeyField,
+  }).describe(
+    "Extract a design system from a node subtree. Scans colors, text styles, spacing and radii, creates Variables in the target collection and Paint/Text Styles. Returns a manifestId usable with create_styles_table and apply_design_system."
+  ),
+  create_styles_table: z.object({
+    manifestId: z.string().describe("Manifest ID returned from extract_design_system."),
+    options: z.object({
+      pageName: z.string().optional().describe('Page name to put the table on (default "📐 Design System").'),
+      columns: z.number().int().min(1).max(8).optional().describe("Grid columns (default 4)."),
+      cellSize: z.number().int().min(40).max(160).optional().describe("Color swatch size in px (default 80)."),
+    }).optional(),
+    fileKey: fileKeyField,
+  }).describe(
+    "Render a visual reference table of paint/text styles on a dedicated page. Each cell shows a preview bound to the corresponding Variable / Style from the manifest."
+  ),
+  apply_design_system: z.object({
+    manifestId: z.string().describe("Manifest ID returned from extract_design_system."),
+    nodeIds: z.array(figmaNodeId).min(1).describe("Nodes to apply the design system to (recursive)."),
+    options: z.object({
+      dryRun: z.boolean().optional().describe("If true, return what would change without applying."),
+      skipMissing: z.boolean().optional().describe("If true, skip values not in the manifest (default false = count as skipped)."),
+    }).optional(),
+    fileKey: fileKeyField,
+  }).describe(
+    "Apply a design system (extracted earlier) to the given nodes. Replaces hardcoded fills, text styles and corner radii with Variables and Styles from the manifest. Use dryRun=true to preview."
+  ),
 } as const;
 
 type ToolName = keyof typeof toolInputSchemas;
@@ -709,6 +742,9 @@ const rpcToArgs: Record<
   get_dev_html: (nodeIds, params) => ({ nodeId: nodeIds?.[0], ...params }),
   get_dev_json: (nodeIds, params) => ({ nodeId: nodeIds?.[0], ...params }),
   get_dev_image: (nodeIds, params) => ({ nodeId: nodeIds?.[0], ...params }),
+  extract_design_system: (nodeIds, params) => ({ nodeId: nodeIds?.[0], ...params }),
+  create_styles_table: (_nodeIds, params) => params,
+  apply_design_system: (nodeIds, params) => ({ nodeIds, ...params }),
 };
 
 /**

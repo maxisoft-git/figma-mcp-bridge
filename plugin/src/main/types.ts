@@ -53,7 +53,10 @@ export type RequestType =
   | "get_dev_svg"
   | "get_dev_html"
   | "get_dev_json"
-  | "get_dev_image";
+  | "get_dev_image"
+  | "extract_design_system"
+  | "create_styles_table"
+  | "apply_design_system";
 
 export type ServerRequest = {
   type: RequestType;

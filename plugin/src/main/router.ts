@@ -55,6 +55,9 @@ import { handle as get_dev_svg } from "./handlers/get_dev_svg";
 import { handle as get_dev_html } from "./handlers/get_dev_html";
 import { handle as get_dev_json } from "./handlers/get_dev_json";
 import { handle as get_dev_image } from "./handlers/get_dev_image";
+import { handle as extract_design_system } from "./handlers/extract_design_system";
+import { handle as create_styles_table } from "./handlers/create_styles_table";
+import { handle as apply_design_system } from "./handlers/apply_design_system";
 
 type Handler = (request: ServerRequest) => Promise<PluginResponse>;
 
@@ -114,6 +117,9 @@ const handlers: Record<RequestType, Handler> = {
   get_dev_html,
   get_dev_json,
   get_dev_image,
+  extract_design_system,
+  create_styles_table,
+  apply_design_system,
 };
 
 export const dispatch = async (

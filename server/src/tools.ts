@@ -2,6 +2,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import type { Node } from "./node.js";
+import { Follower } from "./follower.js";
 import {
   createFrameInput,
   createImageInput,
@@ -69,7 +70,6 @@ export function registerTools(server: McpServer, node: Node, port: number): void
         let files = node.listConnectedFiles();
         if (files.length === 0) {
           // Follower: fetch via RPC from leader
-          const { Follower } = await import("./follower.js");
           const follower = new Follower(`http://localhost:${port}`);
           files = await follower.listConnectedFiles();
         }
@@ -662,11 +662,45 @@ export function registerTools(server: McpServer, node: Node, port: number): void
 
   server.tool(
     "get_dev_image",
-    "Dev Mode Mirror: extract the image from a node. Tries (1) direct imageHash, (2) imageHash on a direct child, (3) node.exportAsync(PNG) fallback. Pass nodeIds[0] to target a specific node; otherwise uses the current selection. Returns { nodeId, nodeName, nodeType, mime, source, scaleMode, base64, bytes }.",
+    "Dev Mode Mirror: extract the image from a node. Tries (1) direct imageHash, (2) imageHash on a direct child, (3) node.exportAsync(PNG) fallback. Returns { nodeId, nodeName, nodeType, mime, source, scaleMode, base64, bytes }.",
     toolInputSchemas.get_dev_image.shape,
     async ({ fileKey, nodeIds }): Promise<ToolResult> => {
       return renderResponse(() =>
         node.sendWithParams("get_dev_image", nodeIds, undefined, fileKey)
+      );
+    }
+  );
+
+  // ---- Design System automation ----
+  server.tool(
+    "extract_design_system",
+    "Extract a design system from a node subtree. Scans all unique colors (SOLID fills), text styles, spacing values (auto-layout padding/gap) and corner radii. Creates Variables in the target Variable collection and Paint/Text Styles. Returns a manifestId that can be passed to create_styles_table and apply_design_system. Typical workflow: extract from a master frame, then apply to other pages.",
+    toolInputSchemas.extract_design_system.shape,
+    async ({ fileKey, ...params }): Promise<ToolResult> => {
+      return renderResponse(() =>
+        node.sendWithParams("extract_design_system", undefined, params, fileKey)
+      );
+    }
+  );
+
+  server.tool(
+    "create_styles_table",
+    "Render a visual reference table of paint styles and text styles from a design system manifest on a dedicated '📐 Design System' page. Each color cell shows a swatch bound to the underlying Variable; each text cell shows a sample bound to the text style. Use after extract_design_system to give humans a browsable overview.",
+    toolInputSchemas.create_styles_table.shape,
+    async ({ fileKey, ...params }): Promise<ToolResult> => {
+      return renderResponse(() =>
+        node.sendWithParams("create_styles_table", undefined, params, fileKey)
+      );
+    }
+  );
+
+  server.tool(
+    "apply_design_system",
+    "Apply a design system (extracted earlier) to the given nodes. Walks recursively and replaces hardcoded SOLID fills, text styles and corner radii with Variables / Styles from the manifest. Use dryRun=true to preview changes without applying them. Use skipMissing=true to leave values not in the manifest untouched instead of counting them as skipped.",
+    toolInputSchemas.apply_design_system.shape,
+    async ({ fileKey, ...params }): Promise<ToolResult> => {
+      return renderResponse(() =>
+        node.sendWithParams("apply_design_system", undefined, params, fileKey)
       );
     }
   );

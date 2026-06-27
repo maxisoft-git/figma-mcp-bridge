@@ -1,10 +1,23 @@
+import http from "node:http";
 import type { BridgeResponse, ConnectedFile, RPCRequest, RPCResponse } from "./types.js";
 
 /**
  * Follower proxies MCP tool calls to the leader via HTTP /rpc.
+ *
+ * Uses a persistent http.Agent with `keepAlive: true` so the TCP
+ * connection to the leader is reused across calls. Without it, every
+ * fetch opens a new socket, paying ~10-50ms of TCP/TLS handshake.
  */
 export class Follower {
-  constructor(private leaderUrl: string) {}
+  private agent: http.Agent;
+
+  constructor(private leaderUrl: string) {
+    this.agent = new http.Agent({
+      keepAlive: true,
+      maxSockets: 4,
+      keepAliveMsecs: 30_000,
+    });
+  }
 
   send(
     requestType: string,
@@ -27,7 +40,12 @@ export class Follower {
 
     const response = await fetch(`${this.leaderUrl}/rpc`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      // @ts-expect-error — Node fetch accepts the dispatcher option.
+      dispatcher: this.agent,
+      headers: {
+        "Content-Type": "application/json",
+        "Accept-Encoding": "gzip",
+      },
       body: JSON.stringify(rpcReq),
       signal: AbortSignal.timeout(35_000),
     });
@@ -36,6 +54,7 @@ export class Follower {
       throw new Error(`Leader returned status ${response.status}`);
     }
 
+    // response.json() in undici auto-decompresses gzip / br / deflate.
     const rpcResp = (await response.json()) as RPCResponse;
 
     if (rpcResp.error) {
@@ -52,7 +71,12 @@ export class Follower {
   async listConnectedFiles(): Promise<ConnectedFile[]> {
     const response = await fetch(`${this.leaderUrl}/rpc`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      // @ts-expect-error — Node fetch accepts the dispatcher option.
+      dispatcher: this.agent,
+      headers: {
+        "Content-Type": "application/json",
+        "Accept-Encoding": "gzip",
+      },
       body: JSON.stringify({ tool: "list_files" } as RPCRequest),
       signal: AbortSignal.timeout(5_000),
     });
@@ -72,6 +96,8 @@ export class Follower {
   async ping(): Promise<boolean> {
     try {
       const response = await fetch(`${this.leaderUrl}/ping`, {
+        // @ts-expect-error — Node fetch accepts the dispatcher option.
+        dispatcher: this.agent,
         signal: AbortSignal.timeout(2_000),
       });
       return response.ok;
