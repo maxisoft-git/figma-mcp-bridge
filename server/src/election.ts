@@ -78,14 +78,15 @@ export class Election {
         // stop it. (Normally startTicker() is not called when Leader.)
         this.clearTicker();
         break;
-      case Role.Unknown:
+      case Role.Unknown: {
         await this.determineRole();
-        if (this.node.role === Role.Follower) {
+        this.clearTicker();
+        const role = this.node.role as Role;
+        if (role === Role.Follower) {
           this.startTicker();
-        } else {
-          this.clearTicker();
         }
         break;
+      }
     }
   }
 

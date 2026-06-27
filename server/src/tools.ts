@@ -704,6 +704,18 @@ export function registerTools(server: McpServer, node: Node, port: number): void
       );
     }
   );
+
+  // ---- Manifest management ----
+  server.tool(
+    "manage_manifests",
+    "List all stored design system manifests, or delete a specific one. Manifests are persisted to ~/.figma-mcp-bridge/manifests/ as JSON files and survive plugin restarts. Use mode='list' to enumerate, mode='delete' with manifestId to remove.",
+    toolInputSchemas.manage_manifests.shape,
+    async ({ fileKey, ...params }): Promise<ToolResult> => {
+      return renderResponse(() =>
+        node.sendWithParams("manage_manifests", undefined, params, fileKey)
+      );
+    }
+  );
 }
 
 export async function executeSaveScreenshots(

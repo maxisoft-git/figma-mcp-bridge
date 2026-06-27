@@ -8,7 +8,7 @@
  *   - Radius values       → Map<value, count>  (from cornerRadius)
  */
 
-import { paintHash, typographyHash } from "./ds-hash.js";
+import { paintHash, typographyHash, effectHash } from "./ds-hash.js";
 import { normalizeHex } from "./ds-naming.js";
 
 export interface CollectOptions {
@@ -26,6 +26,13 @@ export interface TextStyleSample {
   sampleNodeId: string;
 }
 
+export interface EffectSample {
+  hash: string;
+  effect: Effect;
+  count: number;
+  sampleNodeId: string;
+}
+
 export interface CollectedStats {
   /** hex (lowercase) → count of unique nodes using this color. */
   colors: Map<string, number>;
@@ -39,6 +46,8 @@ export interface CollectedStats {
   spacing: Map<number, number>;
   /** value → count (corner radius). */
   radii: Map<number, number>;
+  /** effectHash → sample. */
+  effects: Map<string, EffectSample>;
 }
 
 export interface TextStyleLike {
@@ -78,6 +87,7 @@ export function collectStats(
     textStyles: [],
     spacing: new Map(),
     radii: new Map(),
+    effects: new Map(),
   };
   // Map hash → index in result.textStyles for dedup.
   const textStyleIndex = new Map<string, number>();
@@ -169,6 +179,23 @@ export function collectStats(
         }
       }
     }
+
+    // Effects (shadows, blurs)
+    if ("effects" in node) {
+      const effects = (node as BlendMixin).effects;
+      if (Array.isArray(effects) && effects.length > 0) {
+        for (const eff of effects as readonly Effect[]) {
+          if (eff.visible === false) continue;
+          const hash = effectHash(eff);
+          const existing = result.effects.get(hash);
+          if (existing) {
+            existing.count++;
+          } else {
+            result.effects.set(hash, { hash, effect: eff, count: 1, sampleNodeId: node.id });
+          }
+        }
+      }
+    }
   }
 }
 
@@ -191,5 +218,7 @@ export function filterStatsByOccurrence(
   for (const [k, v] of stats.spacing) if (v >= minOccurrences) spacing.set(k, v);
   const radii = new Map<number, number>();
   for (const [k, v] of stats.radii) if (v >= minOccurrences) radii.set(k, v);
-  return { colors, colorNodeIds: stats.colorNodeIds, paintStyles, textStyles, spacing, radii };
+  const effects = new Map<string, EffectSample>();
+  for (const [k, v] of stats.effects) if (v.count >= minOccurrences) effects.set(k, v);
+  return { colors, colorNodeIds: stats.colorNodeIds, paintStyles, textStyles, spacing, radii, effects };
 }

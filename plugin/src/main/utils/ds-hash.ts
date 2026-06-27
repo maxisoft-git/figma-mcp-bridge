@@ -82,3 +82,19 @@ function letterSpacingKey(ls: LetterSpacing | typeof figma.mixed): string {
   if ("value" in ls) return `ls-${ls.unit}-${ls.value.toFixed(2)}`;
   return `ls-${ls.unit}`;
 }
+
+/** Hash an Effect by its semantic properties (ignores node id / name). */
+export function effectHash(effect: Effect): string {
+  if (effect.type === "DROP_SHADOW" || effect.type === "INNER_SHADOW") {
+    const { color, offset, radius, spread, blendMode, visible, showShadowBehindNode } = effect;
+    const colorHex = normalizeHex(rgbToHex(color));
+    return fnv1a(
+      `shadow|${effect.type}|${colorHex}|${offset.x.toFixed(2)}|${offset.y.toFixed(2)}|${radius.toFixed(2)}|${(spread ?? 0).toFixed(2)}|${blendMode}|${visible}|${showShadowBehindNode ?? false}`,
+    );
+  }
+  if (effect.type === "LAYER_BLUR" || effect.type === "BACKGROUND_BLUR") {
+    const { radius, visible } = effect;
+    return fnv1a(`blur|${effect.type}|${radius.toFixed(2)}|${visible}`);
+  }
+  return fnv1a(`effect|${effect.type}`);
+}

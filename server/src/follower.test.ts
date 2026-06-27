@@ -28,7 +28,8 @@ describe("Follower", () => {
       const result = await follower.sendWithParams("get_node", ["1:23"], undefined, "abc");
 
       expect(mockFetch).toHaveBeenCalledTimes(1);
-      const [url, init] = mockFetch.mock.calls[0]!;
+      const call = mockFetch.mock.calls[0]!;
+      const [url, init] = call as [string, { method?: string; headers?: Record<string, string>; body?: string }];
       expect(url).toBe(`${baseUrl}/rpc`);
       expect(init.method).toBe("POST");
       expect(init.headers).toEqual({
@@ -55,7 +56,9 @@ describe("Follower", () => {
 
       await follower.sendWithParams("get_metadata", undefined, {}, "k");
 
-      const body = JSON.parse(mockFetch.mock.calls[0]![1].body as string);
+      const call = mockFetch.mock.calls[0]!;
+      const init = call[1] as { body: string };
+      const body = JSON.parse(init.body);
       expect(body).toEqual({ tool: "get_metadata", fileKey: "k" });
     });
 
@@ -64,8 +67,9 @@ describe("Follower", () => {
         new Response(JSON.stringify({ data: null }), { status: 200 }),
       );
       await follower.sendWithParams("get_node");
-      const headers = mockFetch.mock.calls[0]![1].headers as Record<string, string>;
-      expect(headers["Accept-Encoding"]).toBe("gzip");
+      const call = mockFetch.mock.calls[0]!;
+      const init = call[1] as { headers: Record<string, string> };
+      expect(init.headers["Accept-Encoding"]).toBe("gzip");
     });
 
     it("throws on non-2xx response", async () => {
@@ -97,7 +101,8 @@ describe("Follower", () => {
       );
 
       await follower.sendWithParams("get_node");
-      const init = mockFetch.mock.calls[0]![1];
+      const call = mockFetch.mock.calls[0]!;
+      const init = call[1] as { signal: unknown };
       expect(init.signal).toBeInstanceOf(AbortSignal);
     });
   });

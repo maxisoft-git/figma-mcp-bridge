@@ -80,7 +80,7 @@ export class Node {
     if (CACHEABLE_TOOLS.has(requestType)) {
       const key = makeCacheKey(requestType, nodeIds, params, fileKey);
       const cached = this.responseCache.get(key);
-      if (cached) return cached;
+      if (cached) return Promise.resolve(cached);
     }
 
     const dispatch = (): Promise<BridgeResponse> => {

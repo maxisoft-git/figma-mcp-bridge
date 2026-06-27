@@ -1,7 +1,7 @@
 import type { ServerRequest, PluginResponse } from "../types";
 import { resolveNode } from "../utils/dev-mode";
 import { getManifest } from "../utils/ds-manifest";
-import { paintHash, typographyHash } from "../utils/ds-hash";
+import { paintHash, typographyHash, effectHash as effectHashLocal } from "../utils/ds-hash";
 import { normalizeHex } from "../utils/ds-naming";
 import type { TextStyleLike } from "../utils/ds-collect";
 
@@ -43,7 +43,7 @@ export async function handle(request: ServerRequest): Promise<PluginResponse> {
   if (!params.nodeIds || params.nodeIds.length === 0) {
     return { type: request.type, requestId: request.requestId, error: { code: "VALIDATION_ERROR", message: "nodeIds is required" } };
   }
-  const manifest = getManifest(params.manifestId);
+  const manifest = await getManifest(params.manifestId);
   if (!manifest) {
     return { type: request.type, requestId: request.requestId, error: { code: "NOT_FOUND", message: `Manifest not found: ${params.manifestId}` } };
   }
@@ -51,7 +51,7 @@ export async function handle(request: ServerRequest): Promise<PluginResponse> {
   const dryRun = params.options?.dryRun ?? false;
   const skipMissing = params.options?.skipMissing ?? false;
   const details: NonNullable<ApplyResult["details"]> = [];
-  const counters = { applied: { fills: 0, texts: 0, radii: 0 }, skipped: { fills: 0, texts: 0, radii: 0 } };
+  const counters = { applied: { fills: 0, texts: 0, radii: 0, effects: 0 }, skipped: { fills: 0, texts: 0, radii: 0, effects: 0 } };
 
   for (const nodeId of params.nodeIds) {
     let node: SceneNode;
@@ -71,6 +71,8 @@ export async function handle(request: ServerRequest): Promise<PluginResponse> {
     applied: counters.applied,
     skipped: counters.skipped,
   };
+  result.applied.effects = counters.applied.effects;
+  result.skipped.effects = counters.skipped.effects;
   if (dryRun) result.details = details;
 
   return { type: request.type, requestId: request.requestId, data: result };
@@ -152,6 +154,33 @@ async function applyToNode(
         details.push({ nodeId: node.id, property: "text", originalValue: hash, mappedTo: ts.styleName });
       } catch {
         counters.skipped.texts++;
+      }
+    }
+  }
+
+  // Effects (apply as EffectStyle — single style per node)
+  if ("effects" in node) {
+    const nodeEffects = (node as BlendMixin).effects;
+    if (Array.isArray(nodeEffects) && nodeEffects.length > 0) {
+      for (const eff of nodeEffects as readonly Effect[]) {
+        if (eff.visible === false) continue;
+        const hash = effectHashLocal(eff);
+        const es = manifest.effects[hash];
+        if (!es) {
+          if (!skipMissing) counters.skipped.effects++;
+          continue;
+        }
+        if (dryRun) {
+          details.push({ nodeId: node.id, property: "effect", originalValue: eff.type, mappedTo: es.styleName });
+        } else {
+          try {
+            (node as BlendMixin).effectStyleId = es.styleId;
+            counters.applied.effects++;
+            details.push({ nodeId: node.id, property: "effect", originalValue: eff.type, mappedTo: es.styleName });
+          } catch {
+            counters.skipped.effects++;
+          }
+        }
       }
     }
   }

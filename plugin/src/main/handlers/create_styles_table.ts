@@ -34,7 +34,7 @@ export async function handle(request: ServerRequest): Promise<PluginResponse> {
       error: { code: "VALIDATION_ERROR", message: "manifestId is required for create_styles_table" },
     };
   }
-  const manifest = getManifest(params.manifestId);
+  const manifest = await getManifest(params.manifestId);
   if (!manifest) {
     return {
       type: request.type,
@@ -81,7 +81,7 @@ export async function handle(request: ServerRequest): Promise<PluginResponse> {
   const varById = new Map<string, Variable>();
   for (const v of allVariables) varById.set(v.id, v);
 
-  const cellsCreated = { colors: 0, textStyles: 0 };
+  const cellsCreated = { colors: 0, textStyles: 0, effects: 0 };
 
   // --- Colors section ---
   const colorEntries = Object.entries(manifest.colors);
@@ -229,6 +229,77 @@ export async function handle(request: ServerRequest): Promise<PluginResponse> {
     }
   }
 
+  // --- Effects section ---
+  const effectEntries = Object.entries(manifest.effects);
+  if (effectEntries.length > 0) {
+    const section = figma.createFrame();
+    section.name = "Effects";
+    section.layoutMode = "VERTICAL";
+    section.itemSpacing = 12;
+    section.fills = [];
+    section.primaryAxisSizingMode = "AUTO";
+    section.counterAxisSizingMode = "AUTO";
+    outer.appendChild(section);
+
+    const sectionTitle = figma.createText();
+    sectionTitle.fontName = { family: "Inter", style: "Bold" };
+    sectionTitle.fontSize = 18;
+    sectionTitle.characters = "Effects";
+    section.appendChild(sectionTitle);
+
+    const grid = figma.createFrame();
+    grid.name = "Grid";
+    grid.layoutMode = "HORIZONTAL";
+    grid.layoutWrap = "WRAP";
+    grid.itemSpacing = CELL_GAP;
+    grid.counterAxisSpacing = CELL_GAP;
+    grid.fills = [];
+    grid.primaryAxisSizingMode = "FIXED";
+    grid.counterAxisSizingMode = "AUTO";
+    grid.resize(columns * (cellSize + 80), 1);
+    section.appendChild(grid);
+
+    for (const [, info] of effectEntries) {
+      const cell = figma.createFrame();
+      cell.name = info.styleName;
+      cell.layoutMode = "VERTICAL";
+      cell.itemSpacing = 6;
+      cell.paddingTop = 8;
+      cell.paddingBottom = 8;
+      cell.paddingLeft = 8;
+      cell.paddingRight = 8;
+      cell.fills = [];
+      cell.primaryAxisSizingMode = "AUTO";
+      cell.counterAxisSizingMode = "AUTO";
+      grid.appendChild(cell);
+
+      // Preview shape: a circle for shadows, a square for blurs
+      const isBlur = info.type === "LAYER_BLUR" || info.type === "BACKGROUND_BLUR";
+      const preview = isBlur
+        ? figma.createRectangle()
+        : figma.createEllipse();
+      preview.name = "preview";
+      preview.resize(cellSize, cellSize);
+      preview.fills = [{ type: "SOLID", color: { r: 0.9, g: 0.9, b: 0.9 } }];
+      // Bind the effect style to the preview shape.
+      try {
+        preview.effectStyleId = info.styleId;
+      } catch {
+        // font/style missing — leave unbound
+      }
+      cell.appendChild(preview);
+
+      const label = figma.createText();
+      label.fontName = { family: "Inter", style: "Regular" };
+      label.fontSize = 11;
+      label.characters = info.styleName;
+      label.textAutoResize = "WIDTH_AND_HEIGHT";
+      cell.appendChild(label);
+
+      cellsCreated.effects++;
+    }
+  }
+
   return {
     type: request.type,
     requestId: request.requestId,
@@ -236,7 +307,11 @@ export async function handle(request: ServerRequest): Promise<PluginResponse> {
       pageId: page.id,
       pageName: page.name,
       frameId: outer.id,
-      cellsCreated,
+      cellsCreated: {
+        colors: cellsCreated.colors,
+        textStyles: cellsCreated.textStyles,
+        effects: cellsCreated.effects,
+      },
     },
   };
 }

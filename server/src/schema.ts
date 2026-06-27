@@ -630,26 +630,31 @@ export const toolInputSchemas = {
   // Dev Mode Mirror — ported from figma-dev. Exports CSS, SVG, HTML, JSON, IMG
   // for a single node (selected by default or by nodeId).
   get_dev_css: z.object({
+    nodeIds: z.array(figmaNodeId).optional().describe("Optional nodeId. If absent, uses current selection."),
     fileKey: fileKeyField,
   }).describe(
     "Dev Mode Mirror: get the CSS for a node (selected by default, or pass nodeId in nodeIds). Returns plain CSS string for the single node — no subtree walk."
   ),
   get_dev_svg: z.object({
+    nodeIds: z.array(figmaNodeId).optional().describe("Optional nodeId. If absent, uses current selection."),
     fileKey: fileKeyField,
   }).describe(
     "Dev Mode Mirror: export a node as SVG with all styles inlined as XML attributes (matches what Figma's Dev Mode shows)."
   ),
   get_dev_html: z.object({
+    nodeIds: z.array(figmaNodeId).optional().describe("Optional nodeId. If absent, uses current selection."),
     fileKey: fileKeyField,
   }).describe(
     "Dev Mode Mirror: compose a simplified HTML document for a node by walking its children. Capped at 200 nodes / 12 levels deep to keep the sandbox responsive. Image fills are NOT inlined."
   ),
   get_dev_json: z.object({
+    nodeIds: z.array(figmaNodeId).optional().describe("Optional nodeId. If absent, uses current selection."),
     fileKey: fileKeyField,
   }).describe(
     "Dev Mode Mirror: get the raw getCSSAsync() key/value object for a node, plus a depth-2 structural dump of the node tree."
   ),
   get_dev_image: z.object({
+    nodeIds: z.array(figmaNodeId).optional().describe("Optional nodeId. If absent, uses current selection."),
     fileKey: fileKeyField,
   }).describe(
     "Dev Mode Mirror: extract the image from a node. Tries (1) direct imageHash, (2) imageHash on a direct child, (3) node.exportAsync(PNG) fallback. Returns base64 string + mime + source."
@@ -663,7 +668,16 @@ export const toolInputSchemas = {
     skipHidden: z.boolean().optional().describe("Skip hidden nodes (default true)."),
     fileKey: fileKeyField,
   }).describe(
-    "Extract a design system from a node subtree. Scans colors, text styles, spacing and radii, creates Variables in the target collection and Paint/Text Styles. Returns a manifestId usable with create_styles_table and apply_design_system."
+    "Extract a design system from a single node subtree. Scans colors, text styles, spacing, radii and effects, creates Variables in the target collection and Paint/Text/Effect Styles. Returns a manifestId usable with create_styles_table and apply_design_system."
+  ),
+  extract_design_system_bulk: z.object({
+    nodeIds: z.array(figmaNodeId).min(1).describe("Root nodes to scan. Their stats are merged into a single manifest."),
+    collectionName: z.string().optional().describe('Variable collection name to write into (default "Design System").'),
+    minOccurrences: z.number().int().min(1).optional().describe("Skip values that appear fewer than N times across all nodes (default 1 = keep all)."),
+    skipHidden: z.boolean().optional().describe("Skip hidden nodes (default true)."),
+    fileKey: fileKeyField,
+  }).describe(
+    "Extract a design system from multiple node subtrees. Merges stats across all nodes, then creates Variables + Paint/Text/Effect Styles in the target collection. Useful for building a design system from a set of canonical screens. Returns a single manifestId covering everything."
   ),
   create_styles_table: z.object({
     manifestId: z.string().describe("Manifest ID returned from extract_design_system."),
@@ -686,6 +700,13 @@ export const toolInputSchemas = {
     fileKey: fileKeyField,
   }).describe(
     "Apply a design system (extracted earlier) to the given nodes. Replaces hardcoded fills, text styles and corner radii with Variables and Styles from the manifest. Use dryRun=true to preview."
+  ),
+  manage_manifests: z.object({
+    mode: z.enum(["list", "delete"]).describe("Operation to perform: list (return all manifests) or delete (remove one)."),
+    manifestId: z.string().optional().describe("Required when mode='delete'. ID returned from extract_design_system."),
+    fileKey: fileKeyField,
+  }).describe(
+    "List all stored design system manifests, or delete a specific one. Manifests are persisted to ~/.figma-mcp-bridge/manifests/ and survive plugin restarts."
   ),
 } as const;
 
@@ -743,8 +764,10 @@ const rpcToArgs: Record<
   get_dev_json: (nodeIds, params) => ({ nodeId: nodeIds?.[0], ...params }),
   get_dev_image: (nodeIds, params) => ({ nodeId: nodeIds?.[0], ...params }),
   extract_design_system: (nodeIds, params) => ({ nodeId: nodeIds?.[0], ...params }),
+  extract_design_system_bulk: (nodeIds, params) => ({ nodeIds, ...params }),
   create_styles_table: (_nodeIds, params) => params,
   apply_design_system: (nodeIds, params) => ({ nodeIds, ...params }),
+  manage_manifests: (_nodeIds, params) => params,
 };
 
 /**

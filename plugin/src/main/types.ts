@@ -55,8 +55,10 @@ export type RequestType =
   | "get_dev_json"
   | "get_dev_image"
   | "extract_design_system"
+  | "extract_design_system_bulk"
   | "create_styles_table"
-  | "apply_design_system";
+  | "apply_design_system"
+  | "manage_manifests";
 
 export type ServerRequest = {
   type: RequestType;
