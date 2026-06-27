@@ -971,6 +971,47 @@ export const toolInputSchemas = {
   }).describe(
     "Mirror of Figma's Dev Mode Inspect panel: full box model, constraints, typography, fills/strokes/effects with bound variables, layout subtree, component binding."
   ),
+
+  // Tier 4 — Design system marketplace + spec import
+  export_design_tokens: z.object({
+    manifestId: z.string().optional().describe("Specific manifest id. Omit or pass 'all' to export all stored manifests."),
+    includeSummary: z.boolean().optional().describe("Include per-manifest stats. Default true."),
+    fileKey: fileKeyField,
+  }).describe(
+    "Export stored design system manifest(s) as a JSON string. Returns { json, bytes, manifestCount, summary } — the JSON can be saved to disk and re-imported later."
+  ),
+  import_design_tokens: z.object({
+    json: z.string().min(1).describe("JSON string from export_design_tokens or an external source."),
+    mergeInto: z.string().optional().describe("When set, merge into an existing manifest by id instead of creating a new one."),
+    fileKey: fileKeyField,
+  }).describe(
+    "Import a design system manifest from JSON. Returns the new (or merged) manifestId with counts."
+  ),
+  find_nodes_by_variable: z.object({
+    variable: z.string().min(1).describe("Variable id (VariableID:...) OR variable name."),
+    global: z.boolean().optional().describe("Search all pages. Default true. If false, only current page."),
+    limit: z.number().int().min(1).max(5000).optional().describe("Max results. Default 500."),
+    fileKey: fileKeyField,
+  }).describe(
+    "Find all nodes that bind to a given design variable. Returns the list of usages with nodeId, name, type, boundOn (field name), and current value."
+  ),
+  storybook_import: z.object({
+    parentId: figmaNodeId.describe("Where the new frame will be created."),
+    name: z.string().min(1).describe("Frame name."),
+    spec: z.string().min(1).describe("JSON string of the structure. Schema: { type: 'text'|'rect'|'frame'|'circle', ... }."),
+    fileKey: fileKeyField,
+  }).describe(
+    "Create a Figma frame from a Storybook-like JSON spec. Supports nested 'frame' with auto-layout, plus 'text', 'rect', 'circle'."
+  ),
+  spec_import: z.object({
+    parentId: figmaNodeId.describe("Where the new component will be created."),
+    name: z.string().min(1).describe("Component name."),
+    spec: z.string().min(1).describe("JSON string of the layout. Schema: { type: 'row'|'column'|'text'|'button'|'input'|'rect', ... }."),
+    tokens: z.record(z.string(), z.string()).optional().describe("Token references: { 'token-name': '#hex' }. Fill values matching a token name will use the hex."),
+    fileKey: fileKeyField,
+  }).describe(
+    "Create a Figma component from a declarative spec. Designed for high-level UI descriptions like 'a row with a title and a button'. Supports 'row', 'column', 'text', 'button', 'input', 'rect' primitives with auto-layout."
+  ),
 } as const;
 
 type ToolName = keyof typeof toolInputSchemas;
@@ -1059,6 +1100,11 @@ const rpcToArgs: Record<
   set_node_metadata: (nodeIds, params) => ({ nodeIds, ...params }),
   get_node_metadata: (nodeIds, params) => ({ nodeIds, ...params }),
   figma_inspect: (nodeIds, params) => ({ nodeIds, ...params }),
+  export_design_tokens: (_nodeIds, params) => params,
+  import_design_tokens: (_nodeIds, params) => params,
+  find_nodes_by_variable: (_nodeIds, params) => params,
+  storybook_import: (_nodeIds, params) => params,
+  spec_import: (_nodeIds, params) => params,
 };
 
 /**

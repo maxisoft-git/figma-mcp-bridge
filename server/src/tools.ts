@@ -1027,6 +1027,62 @@ export function registerTools(server: McpServer, node: Node, port: number): void
       );
     }
   );
+
+  // ---- Tier 4 — design system marketplace + spec import ----
+  server.tool(
+    "export_design_tokens",
+    "Export stored design system manifest(s) as a JSON string. The JSON can be saved to disk and re-imported later. Useful for backing up a design system or sharing it across projects.",
+    toolInputSchemas.export_design_tokens.shape,
+    async ({ fileKey, ...params }): Promise<ToolResult> => {
+      return renderResponse(() =>
+        node.sendWithParams("export_design_tokens", undefined, params, fileKey)
+      );
+    }
+  );
+
+  server.tool(
+    "import_design_tokens",
+    "Import a design system manifest from JSON (e.g. from export_design_tokens or an external source). Returns the new (or merged) manifestId with counts.",
+    toolInputSchemas.import_design_tokens.shape,
+    async ({ fileKey, ...params }): Promise<ToolResult> => {
+      return renderResponse(() =>
+        node.sendWithParams("import_design_tokens", undefined, params, fileKey)
+      );
+    }
+  );
+
+  server.tool(
+    "find_nodes_by_variable",
+    "Find all nodes that bind to a given design variable. Useful for refactoring: 'find all nodes using color/primary/500 before I change it'.",
+    toolInputSchemas.find_nodes_by_variable.shape,
+    async ({ fileKey, ...params }): Promise<ToolResult> => {
+      return renderResponse(() =>
+        node.sendWithParams("find_nodes_by_variable", undefined, params, fileKey)
+      );
+    }
+  );
+
+  server.tool(
+    "storybook_import",
+    "Create a Figma frame from a Storybook-like JSON spec. Supports nested 'frame' with auto-layout, plus 'text', 'rect', 'circle'.",
+    toolInputSchemas.storybook_import.shape,
+    async ({ fileKey, ...params }): Promise<ToolResult> => {
+      return renderResponse(() =>
+        node.sendWithParams("storybook_import", undefined, params, fileKey)
+      );
+    }
+  );
+
+  server.tool(
+    "spec_import",
+    "Create a Figma component from a declarative spec. Designed for high-level UI descriptions like 'a row with a title and a button'. Supports 'row', 'column', 'text', 'button', 'input', 'rect' primitives with auto-layout. Optional 'tokens' map for design system variable references.",
+    toolInputSchemas.spec_import.shape,
+    async ({ fileKey, ...params }): Promise<ToolResult> => {
+      return renderResponse(() =>
+        node.sendWithParams("spec_import", undefined, params, fileKey)
+      );
+    }
+  );
 }
 
 export async function executeSaveScreenshots(

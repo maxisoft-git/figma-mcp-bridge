@@ -87,6 +87,11 @@ import { handle as create_design_token_alias } from "./handlers/create_design_to
 import { handle as bulk_swap_text } from "./handlers/bulk_swap_text";
 import { handleSet as set_node_metadata, handleGet as get_node_metadata } from "./handlers/node_metadata";
 import { handle as figma_inspect } from "./handlers/figma_inspect";
+import { handle as export_design_tokens } from "./handlers/export_design_tokens";
+import { handle as import_design_tokens } from "./handlers/import_design_tokens";
+import { handle as find_nodes_by_variable } from "./handlers/find_nodes_by_variable";
+import { handle as storybook_import } from "./handlers/storybook_import";
+import { handle as spec_import } from "./handlers/spec_import";
 
 type Handler = (request: ServerRequest) => Promise<PluginResponse>;
 
@@ -179,6 +184,11 @@ const handlers: Record<RequestType, Handler> = {
   set_node_metadata,
   get_node_metadata,
   figma_inspect,
+  export_design_tokens,
+  import_design_tokens,
+  find_nodes_by_variable,
+  storybook_import,
+  spec_import,
 };
 
 export const dispatch = async (

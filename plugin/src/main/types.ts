@@ -86,7 +86,12 @@ export type RequestType =
   | "bulk_swap_text"
   | "set_node_metadata"
   | "get_node_metadata"
-  | "figma_inspect";
+  | "figma_inspect"
+  | "export_design_tokens"
+  | "import_design_tokens"
+  | "find_nodes_by_variable"
+  | "storybook_import"
+  | "spec_import";
 
 export type ServerRequest = {
   type: RequestType;
