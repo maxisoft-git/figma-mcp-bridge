@@ -23,11 +23,35 @@ const errorToString = (error: unknown): string => {
   }
 };
 
+// Bridge sends tool args inside `request.params` (see bridge.ts sendWithParams),
+// but most handlers were written assuming the args live at the request
+// root (e.g. `request.nodeIds[0]`, `request.json`). Lift the fields the
+// handlers actually use so existing code Just Works regardless of which
+// path the request came through. Specifically:
+//   - nodeIds (used by 30+ handlers)
+//   - nodeId  (some handlers use the singular form)
+//   - json    (storybook_import / spec_import take a JSON spec as a string)
+const FIELDS_TO_LIFT = ["nodeIds", "nodeId", "json"] as const;
+
+const normalizeRequest = (request: ServerRequest): ServerRequest => {
+  if (!request.params) return request;
+  const params = request.params as Record<string, unknown>;
+  let changed = false;
+  const out: Record<string, unknown> = { ...request };
+  for (const key of FIELDS_TO_LIFT) {
+    if (out[key] === undefined && params[key] !== undefined) {
+      out[key] = params[key];
+      changed = true;
+    }
+  }
+  return changed ? (out as ServerRequest) : request;
+};
+
 const handleRequest = async (
   request: ServerRequest
 ): Promise<PluginResponse> => {
   try {
-    return await dispatch(request);
+    return await dispatch(normalizeRequest(request));
   } catch (error) {
     // Handlers commonly throw PluginError objects (from errors.ts) — those
     // aren't Error instances, so `String(error)` would give "[object Object]"
