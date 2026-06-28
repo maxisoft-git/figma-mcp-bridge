@@ -1,0 +1,119 @@
+name: Publish
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version (semantic, e.g. 1.0.0). Tag pushes use the tag itself."
+        required: false
+        type: string
+
+permissions:
+  contents: write
+  id-token: write   # Required for npm Trusted Publishing (no NPM_TOKEN needed)
+
+jobs:
+  publish:
+    name: publish to npm + GitHub release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          registry-url: https://registry.npmjs.org
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      # ── Resolve version ────────────────────────────────────────────────
+
+      - name: Resolve version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "push" ]; then
+            VERSION="${GITHUB_REF#refs/tags/v}"
+          elif [ -n "${{ inputs.version }}" ]; then
+            VERSION="${{ inputs.version }}"
+          else
+            echo "::error::workflow_dispatch requires inputs.version"
+            exit 1
+          fi
+          if ! echo "$VERSION" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?(\+[a-zA-Z0-9.]+)?$'; then
+            echo "::error::Version '$VERSION' is not semver"
+            exit 1
+          fi
+          echo "VERSION=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "→ Publishing version $VERSION"
+
+      # ── Server: install + build + publish ────────────────────────────
+
+      - name: Install server dependencies
+        working-directory: server
+        run: bun install --frozen-lockfile
+
+      - name: Build server
+        working-directory: server
+        run: bun run build
+
+      - name: Bundle README for npm
+        run: cp README.md server/README.md
+
+      - name: Set package version
+        working-directory: server
+        run: npm version ${{ steps.version.outputs.VERSION }} --no-git-tag-version
+
+      - name: Verify CLI entry point
+        working-directory: server
+        run: |
+          head -1 dist/index.js | grep -q '#!/usr/bin/env node' \
+            || { echo "ERROR: dist/index.js is missing the node shebang"; exit 1; }
+
+      - name: Publish server to npm
+        working-directory: server
+        run: npm publish --access public --provenance
+        # Trusted publishing — no NPM_TOKEN needed.
+        # Configure once at https://www.npmjs.com/package/@maxisoft-git%2ffigma-mcp-bridge/access
+        # → Trusted Publishers → Add GitHub Actions
+        #   Repository: maxisoft-git/figma-mcp-bridge
+        #   Workflow:   publish.yml
+
+      # ── Plugin: install + build ───────────────────────────────────────
+
+      - name: Install plugin dependencies
+        working-directory: plugin
+        run: bun install --frozen-lockfile
+
+      - name: Build plugin
+        working-directory: plugin
+        run: bun run build
+
+      # ── GitHub release ────────────────────────────────────────────────
+
+      - name: Package release zip
+        run: |
+          rm -rf release
+          mkdir -p release/plugin
+          cp -r plugin/dist release/plugin/
+          cp plugin/manifest.json release/plugin/
+          cp README.md release/
+          cp LICENSE.md release/
+          cd release
+          zip -r ../figma-mcp-bridge-v${{ steps.version.outputs.VERSION }}.zip .
+
+      - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.version.outputs.VERSION }}
+          name: Release v${{ steps.version.outputs.VERSION }}
+          generate_release_notes: true
+          files: figma-mcp-bridge-v${{ steps.version.outputs.VERSION }}.zip

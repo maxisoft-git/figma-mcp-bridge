@@ -1,0 +1,70 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: test & build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: bun
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      # ── Server: install + test + build ────────────────────────────────
+
+      - name: Install server dependencies
+        working-directory: server
+        run: bun install --frozen-lockfile
+
+      - name: Test server
+        working-directory: server
+        run: bun test
+
+      - name: Build server
+        working-directory: server
+        run: bun run build
+
+      - name: Verify CLI entry point
+        working-directory: server
+        run: |
+          head -1 dist/index.js | grep -q '#!/usr/bin/env node' \
+            || { echo "ERROR: dist/index.js is missing the node shebang"; exit 1; }
+          echo "✓ Shebang present in dist/index.js"
+
+      # ── Plugin: install + test + build ────────────────────────────────
+
+      - name: Install plugin dependencies
+        working-directory: plugin
+        run: bun install --frozen-lockfile
+
+      - name: Test plugin
+        working-directory: plugin
+        run: bun test
+
+      - name: Build plugin
+        working-directory: plugin
+        run: bun run build
+
+      # ── Standalone script: smoke test ─────────────────────────────────
+
+      - name: Smoke test export-via-rpc.mjs
+        working-directory: plugin
+        run: node --check ../scripts/export-via-rpc.mjs || (cd .. && node --check scripts/export-via-rpc.mjs)
