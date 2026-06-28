@@ -4,7 +4,7 @@
 
 **Bridge Figma documents to AI agents through the Model Context Protocol — no Figma API rate limits, no API tokens, no cloud round-trips.**
 
-[![npm version](https://img.shields.io/npm/v/@gethopp/figma-mcp-bridge.svg)](https://www.npmjs.com/package/@gethopp/figma-mcp-bridge)
+[![npm version](https://img.shields.io/npm/v/@maxisoft-git/figma-mcp-bridge.svg)](https://www.npmjs.com/package/@maxisoft-git/figma-mcp-bridge)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE.md)
 [![Node 20+](https://img.shields.io/badge/node-%E2%89%A520-339933.svg)](https://nodejs.org)
 
@@ -18,7 +18,7 @@
 
 It consists of:
 
-1. **MCP Server** (`@gethopp/figma-mcp-bridge`) — a Node.js process that implements the [Model Context Protocol](https://modelcontextprotocol.io/) and exposes **75 Figma-aware tools** to your AI agent.
+1. **MCP Server** (`@maxisoft-git/figma-mcp-bridge`) — a Node.js process that implements the [Model Context Protocol](https://modelcontextprotocol.io/) and exposes **75 Figma-aware tools** to your AI agent.
 2. **Figma Plugin** (private, in this repo) — a Figma plugin that runs inside the Figma sandbox, executes the tools against the real Figma document, and reports results back to the server over a local WebSocket.
 
 A side-channel WebSocket on `ws://localhost:1994` connects the two. There is no cloud service in the loop — everything happens on your machine.
@@ -46,7 +46,7 @@ Figma's public REST API is rate-limited (60 requests / minute per user), require
 │                                                                    │
 │   ┌────────────┐  JSON-RPC /stdio   ┌────────────────────────┐      │
 │   │ AI agent   │ ◄────────────────► │  MCP server (Node.js)  │      │
-│   │ (Claude,   │   tools/call       │  @gethopp/             │      │
+│   │ (Claude,   │   tools/call       │  @maxisoft-git/        │      │
 │   │  Cursor,   │   tools/list       │  figma-mcp-bridge      │      │
 │   │  Cline, …) │                    │                        │      │
 │   └────────────┘                    │  75 tools registered   │      │
@@ -89,7 +89,7 @@ Claude Desktop, Claude Code, Cursor, Cline, Windsurf, etc. all use the same MCP 
   "mcpServers": {
     "figma-bridge": {
       "command": "npx",
-      "args": ["-y", "@gethopp/figma-mcp-bridge"],
+      "args": ["-y", "@maxisoft-git/figma-mcp-bridge"],
       "env": {
         "ALLOWED_ORIGINS_INCLUDE_NULL": "1"
       }
@@ -270,4 +270,4 @@ Push a tag, then run the `Release` GitHub Actions workflow with a semver input. 
 
 ## Acknowledgements
 
-Forked from [gethopp/figma-mcp-bridge](https://github.com/gethopp/figma-mcp-bridge).
+Forked from [gethopp/figma-mcp-bridge](https://github.com/gethopp/figma-mcp-bridge). The MCP server (`@maxisoft-git/figma-mcp-bridge`) is republished under the `maxisoft-git` scope; the Figma plugin is private to this repo.
