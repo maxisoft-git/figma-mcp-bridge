@@ -6,13 +6,34 @@ import { createError, PluginErrorCode } from "./errors";
 import { cssFor, buildHtml, findImageForNode } from "./utils/dev-mode";
 import { serializeNode } from "./serializer";
 
+const errorToString = (error: unknown): string => {
+  if (error == null) return "Unknown error";
+  if (typeof error === "string") return error;
+  if (error instanceof Error) return error.message || error.name || "Error";
+  if (typeof error === "object" && "message" in error) {
+    const m = (error as { message: unknown }).message;
+    if (typeof m === "string") return m;
+    if (m == null) return JSON.stringify(error);
+    return String(m);
+  }
+  try {
+    return JSON.stringify(error);
+  } catch {
+    return String(error);
+  }
+};
+
 const handleRequest = async (
   request: ServerRequest
 ): Promise<PluginResponse> => {
   try {
     return await dispatch(request);
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
+    // Handlers commonly throw PluginError objects (from errors.ts) — those
+    // aren't Error instances, so `String(error)` would give "[object Object]"
+    // and lose the actual message. Unwrap any of: Error, { message }, string,
+    // or fall back to a safe default.
+    const message = errorToString(error);
     return {
       type: request.type,
       requestId: request.requestId,
