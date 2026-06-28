@@ -1,6 +1,6 @@
 {
   "name": "@maxisoft/figma-mcp-bridge",
-  "version": "0.12.0",
+  "version": "0.12.1",
   "description": "MCP server that bridges Figma plugin data to AI tools without hitting API rate limits",
   "type": "module",
   "bin": {
