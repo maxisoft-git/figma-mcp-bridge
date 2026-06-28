@@ -4,7 +4,7 @@
 
 **Bridge Figma documents to AI agents through the Model Context Protocol — no Figma API rate limits, no API tokens, no cloud round-trips.**
 
-[![npm version](https://img.shields.io/npm/v/@maxisoft-git/figma-mcp-bridge.svg)](https://www.npmjs.com/package/@maxisoft-git/figma-mcp-bridge)
+[![npm version](https://img.shields.io/npm/v/@maxisoft/figma-mcp-bridge.svg)](https://www.npmjs.com/package/@maxisoft/figma-mcp-bridge)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE.md)
 [![Node 20+](https://img.shields.io/badge/node-%E2%89%A520-339933.svg)](https://nodejs.org)
 
@@ -18,7 +18,7 @@
 
 It consists of:
 
-1. **MCP Server** (`@maxisoft-git/figma-mcp-bridge`) — a Node.js process that implements the [Model Context Protocol](https://modelcontextprotocol.io/) and exposes **75 Figma-aware tools** to your AI agent.
+1. **MCP Server** (`@maxisoft/figma-mcp-bridge`) — a Node.js process that implements the [Model Context Protocol](https://modelcontextprotocol.io/) and exposes **75 Figma-aware tools** to your AI agent.
 2. **Figma Plugin** (private, in this repo) — a Figma plugin that runs inside the Figma sandbox, executes the tools against the real Figma document, and reports results back to the server over a local WebSocket.
 
 A side-channel WebSocket on `ws://localhost:1994` connects the two. There is no cloud service in the loop — everything happens on your machine.
@@ -46,7 +46,7 @@ Figma's public REST API is rate-limited (60 requests / minute per user), require
 │                                                                    │
 │   ┌────────────┐  JSON-RPC /stdio   ┌────────────────────────┐      │
 │   │ AI agent   │ ◄────────────────► │  MCP server (Node.js)  │      │
-│   │ (Claude,   │   tools/call       │  @maxisoft-git/        │      │
+│   │ (Claude,   │   tools/call       │  @maxisoft/            │      │
 │   │  Cursor,   │   tools/list       │  figma-mcp-bridge      │      │
 │   │  Cline, …) │                    │                        │      │
 │   └────────────┘                    │  75 tools registered   │      │
@@ -89,7 +89,7 @@ Claude Desktop, Claude Code, Cursor, Cline, Windsurf, etc. all use the same MCP 
   "mcpServers": {
     "figma-bridge": {
       "command": "npx",
-      "args": ["-y", "@maxisoft-git/figma-mcp-bridge"],
+      "args": ["-y", "@maxisoft/figma-mcp-bridge"],
       "env": {
         "ALLOWED_ORIGINS_INCLUDE_NULL": "1"
       }
@@ -262,7 +262,7 @@ Releases are tag-driven: push a `v*.*.*` tag and CI handles the rest.
 
 ### One-time setup: npm Trusted Publishing
 
-Trusted Publishing lets GitHub Actions publish to npm **without a token**. Configure it once at <https://www.npmjs.com/package/@maxisoft-git%2ffigma-mcp-bridge/access> → **Trusted Publishers** → **Add GitHub Actions**:
+Trusted Publishing lets GitHub Actions publish to npm **without a token**. Configure it once at <https://www.npmjs.com/package/@maxisoft%2ffigma-mcp-bridge/access> → **Trusted Publishers** → **Add GitHub Actions**:
 
 - Repository: `maxisoft-git/figma-mcp-bridge`
 - Workflow filename: `publish.yml`
@@ -288,7 +288,7 @@ git push origin v0.12.1                             # publish workflow fires
 The `publish.yml` workflow runs:
 
 1. Builds the server (`tsc`), runs tests
-2. Publishes `@maxisoft-git/figma-mcp-bridge@0.12.1` to npm via Trusted Publishing
+2. Publishes `@maxisoft/figma-mcp-bridge@0.12.1` to npm via Trusted Publishing
 3. Builds the plugin (`vite`)
 4. Packages `plugin/dist/` + `README.md` + `LICENSE.md` into a zip
 5. Creates a GitHub Release at the tag, attaches the zip
@@ -318,4 +318,4 @@ If you need to publish without pushing a tag — e.g. retry after a network glit
 
 ## Acknowledgements
 
-Forked from [gethopp/figma-mcp-bridge](https://github.com/gethopp/figma-mcp-bridge). The MCP server (`@maxisoft-git/figma-mcp-bridge`) is republished under the `maxisoft-git` scope; the Figma plugin is private to this repo.
+Forked from [gethopp/figma-mcp-bridge](https://github.com/gethopp/figma-mcp-bridge). The MCP server (`@maxisoft/figma-mcp-bridge`) is republished under the `maxisoft` npm scope; the Figma plugin is private to this repo.

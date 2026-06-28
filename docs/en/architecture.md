@@ -4,7 +4,7 @@
 
 The system has two completely separate Node.js processes that communicate only over a local WebSocket:
 
-1. **MCP server** (`@maxisoft-git/figma-mcp-bridge`, published to npm)
+1. **MCP server** (`@maxisoft/figma-mcp-bridge`, published to npm)
    - Runs wherever your AI client is
    - Implements the Model Context Protocol (stdio transport)
    - Exposes 75 tools that take Zod-validated JSON input and return JSON output

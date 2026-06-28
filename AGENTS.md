@@ -24,7 +24,7 @@ There are no tests. Don't try to run test/lint/typecheck commands—none are con
 
 Two independent packages in a monorepo (no workspace root):
 
-- **`server/`** — Node.js MCP server (`@maxisoft-git/figma-mcp-bridge`). Published to npm. Runs via stdio transport. Uses `@modelcontextprotocol/sdk`, `ws`, `zod`. Leader/follower election allows multiple instances.
+- **`server/`** — Node.js MCP server (`@maxisoft/figma-mcp-bridge`). Published to npm. Runs via stdio transport. Uses `@modelcontextprotocol/sdk`, `ws`, `zod`. Leader/follower election allows multiple instances.
   - Entry: `server/src/index.ts` → `server/dist/index.js`
   - Tool definitions: `server/src/tools.ts`
   - WebSocket bridge to Figma: `server/src/bridge.ts`
