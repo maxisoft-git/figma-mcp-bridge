@@ -27,24 +27,35 @@ const errorToString = (error: unknown): string => {
 // but most handlers were written assuming the args live at the request
 // root (e.g. `request.nodeIds[0]`, `request.json`). Lift the fields the
 // handlers actually use so existing code Just Works regardless of which
-// path the request came through. Specifically:
-//   - nodeIds (used by 30+ handlers)
-//   - nodeId  (some handlers use the singular form)
-//   - json    (storybook_import / spec_import take a JSON spec as a string)
-const FIELDS_TO_LIFT = ["nodeIds", "nodeId", "json"] as const;
-
+// path the request came through.
+//
+// Note: handlers read EITHER `request.nodeIds` (array) OR `request.nodeId`
+// (singular string) — we normalise both forms to BOTH, so:
+//   - params.nodeId  → out.nodeId  AND out.nodeIds = [nodeId]
+//   - params.nodeIds → out.nodeIds (array, as-is)
 const normalizeRequest = (request: ServerRequest): ServerRequest => {
   if (!request.params) return request;
   const params = request.params as Record<string, unknown>;
-  let changed = false;
   const out: Record<string, unknown> = { ...request };
-  for (const key of FIELDS_TO_LIFT) {
-    if (out[key] === undefined && params[key] !== undefined) {
-      out[key] = params[key];
-      changed = true;
+
+  // json (storybook_import / spec_import) — straight lift
+  if (out.json === undefined && typeof params.json === "string") {
+    out.json = params.json;
+  }
+
+  // nodeId (singular) → both forms
+  if (out.nodeId === undefined && typeof params.nodeId === "string") {
+    out.nodeId = params.nodeId;
+  }
+  if (out.nodeIds === undefined) {
+    if (Array.isArray(params.nodeIds)) {
+      out.nodeIds = params.nodeIds;
+    } else if (typeof params.nodeId === "string") {
+      out.nodeIds = [params.nodeId];
     }
   }
-  return changed ? (out as ServerRequest) : request;
+
+  return out as ServerRequest;
 };
 
 const handleRequest = async (
