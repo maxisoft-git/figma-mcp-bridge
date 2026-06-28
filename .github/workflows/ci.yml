@@ -42,8 +42,9 @@ jobs:
         run: bun install --frozen-lockfile
 
       - name: Test server
-        working-directory: server
-        run: bun test
+        working-directory: server        # bunx vitest, not `bun test` — bun's built-in runner
+        # doesn't expose vi.mocked, which the test files rely on.
+        run: bunx vitest run
 
       - name: Build server
         working-directory: server
@@ -64,7 +65,7 @@ jobs:
 
       - name: Test plugin
         working-directory: plugin
-        run: bun test
+        run: bunx vitest run
 
       - name: Build plugin
         working-directory: plugin
