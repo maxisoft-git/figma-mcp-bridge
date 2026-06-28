@@ -24,7 +24,9 @@ export type IconName =
   | "file-text"
   | "scroll-text"
   | "terminal"
-  | "copy";
+  | "copy"
+  | "chevron-up"
+  | "chevron-down";
 
 interface IconProps {
   name: IconName;
@@ -145,6 +147,8 @@ const PATHS: Record<IconName, JSX.Element> = {
       <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" />
     </>
   ),
+  "chevron-up": <polyline points="18 15 12 9 6 15" />,
+  "chevron-down": <polyline points="6 9 12 15 18 9" />,
 };
 
 export function Icon({

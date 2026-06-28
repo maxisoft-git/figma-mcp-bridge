@@ -62,7 +62,12 @@ const parseError = (raw: string): PluginError => ({
 const isPluginMessagePayload = (data: unknown): data is PluginMessage => {
   if (typeof data !== "object" || data === null) return false;
   const d = data as { type?: unknown; pluginMessage?: unknown };
-  if (d.type === "pluginMessage" && isPluginMessage(d.pluginMessage)) {
+  // Figma's wrapper format varies across versions:
+  //   { type: "pluginMessage", pluginMessage: { ... } }   ← older
+  //   { pluginMessage: { ... }, pluginId: "..." }        ← newer
+  // Accept both. We only need the inner pluginMessage to be a valid
+  // PluginMessage type.
+  if (d.pluginMessage !== undefined && isPluginMessage(d.pluginMessage)) {
     return true;
   }
   return false;
@@ -85,6 +90,7 @@ export function useWebSocket(): UseWebSocketReturn {
   const reconnectTimerRef = useRef<number | null>(null);
   const attemptRef = useRef(0);
   const requestStartRef = useRef<Map<string, number>>(new Map());
+  const connectedFileKeyRef = useRef<string>("");
 
   const addLog = useCallback(
     (
@@ -159,23 +165,51 @@ export function useWebSocket(): UseWebSocketReturn {
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
       try {
-        const outer = event.data as { pluginMessage?: unknown } | undefined;
-        if (!outer?.pluginMessage) return;
+        const data = event.data;
+        if (!data || typeof data !== "object") return;
+        const outer = data as Record<string, unknown>;
+        // Permissive: any object with a string `pluginMessage.type` is treated as a message.
+        const inner = outer.pluginMessage as { type?: string } | undefined;
+        if (!inner || typeof inner.type !== "string") return;
 
-        if (!isPluginMessagePayload(outer)) return;
-        const msg = (outer as { pluginMessage: PluginMessage }).pluginMessage;
+        console.log("[bridge-ui] OK message type=", inner.type);
 
-        if (msg.type === "ui-ready") {
+        if (inner.type === "ui-ready") return;
+
+        if (inner.type === "plugin-status") {
+          const msg = inner as unknown as { type: "plugin-status"; payload: { fileKey?: unknown; fileName?: unknown; selectionCount?: number } };
+          const payload = msg.payload;
+          const newFileKey = typeof payload.fileKey === "string" ? payload.fileKey : null;
+          const newFileName = typeof payload.fileName === "string" ? payload.fileName : null;
+          const newSelectionCount = typeof payload.selectionCount === "number" ? payload.selectionCount : null;
+          if (newFileKey === null && newFileName === null && newSelectionCount === null) return;
+          // Only call setStatus if values actually changed. Otherwise we
+          // would re-render and tear down the WebSocket on every status
+          // echo (which the main thread sends after each ui-ready).
+          setStatus((prev) => {
+            const nextFileName = newFileName !== null ? asFileName(newFileName) : prev.fileName;
+            const nextFileKey = newFileKey !== null ? asFileKey(newFileKey) : prev.fileKey;
+            const nextSelectionCount = newSelectionCount !== null ? newSelectionCount : prev.selectionCount;
+            if (
+              nextFileName === prev.fileName &&
+              nextFileKey === prev.fileKey &&
+              nextSelectionCount === prev.selectionCount
+            ) {
+              return prev;
+            }
+            return {
+              fileName: nextFileName,
+              fileKey: nextFileKey,
+              selectionCount: nextSelectionCount,
+            };
+          });
           return;
         }
 
-        if (msg.type === "server-request") {
-          const payload = msg.payload;
-          const payloadObj = payload as Record<string, unknown> | null;
+        if (inner.type === "server-request") {
+          const payload = (inner as { payload: unknown }).payload as Record<string, unknown> | null;
           const requestId =
-            payloadObj && typeof payloadObj.requestId === "string"
-              ? payloadObj.requestId
-              : undefined;
+            payload && typeof payload.requestId === "string" ? payload.requestId : undefined;
 
           // Calculate duration from request to response
           let duration: number | undefined;
@@ -193,13 +227,37 @@ export function useWebSocket(): UseWebSocketReturn {
 
           // Update log with response
           if (requestId) {
-            const errorField = payloadObj?.error;
+            const errorField = payload?.error;
             updateLogByRequestId(requestId, {
               status: errorField ? "error" : "ok",
               duration,
               payload: errorField ? String(errorField) : undefined,
             });
           }
+          return;
+        }
+
+        // Response from main thread to a server request: forward it back
+        // to the server. Main thread replies with a PluginResponse whose
+        // `type` is the original request type (e.g. "get_metadata") and
+        // carries a `requestId` — the case above never matches.
+        const responseObj = inner as { type: string; requestId?: unknown; data?: unknown; error?: unknown };
+        if (typeof responseObj.requestId === "string") {
+          const ws = socketRef.current;
+          if (ws && ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify(inner));
+          }
+          const requestId = responseObj.requestId;
+          let duration: number | undefined;
+          if (requestStartRef.current.has(requestId)) {
+            duration = Date.now() - requestStartRef.current.get(requestId)!;
+            requestStartRef.current.delete(requestId);
+          }
+          updateLogByRequestId(requestId, {
+            status: responseObj.error ? "error" : "ok",
+            duration,
+            payload: responseObj.error ? String(responseObj.error) : undefined,
+          });
         }
       } catch (err) {
         setError(parseError(String(err)));
@@ -209,6 +267,35 @@ export function useWebSocket(): UseWebSocketReturn {
     window.addEventListener("message", handleMessage);
     return () => window.removeEventListener("message", handleMessage);
   }, [updateLogByRequestId]);
+
+  // Fire the "ui-ready" handshake on mount. The main thread's initial
+  // sendStatus() in code.ts posts before this iframe's listener is
+  // registered, so without an explicit ping from us the first status
+  // message is dropped — leaving status.fileKey empty and the WebSocket
+  // connect() guarded by `if (status.fileKey)` never running.
+  useEffect(() => {
+    console.log("[bridge-ui] mount — sending ui-ready");
+    parent.postMessage(
+      { pluginMessage: { type: "ui-ready" } },
+      "*"
+    );
+  }, []);
+
+  // Backup handshake: if no status has arrived within 1s, re-request it.
+  // Belt-and-braces in case the initial ui-ready is lost (timing, dev
+  // tools open, etc.).
+  useEffect(() => {
+    const t = window.setTimeout(() => {
+      if (!status.fileKey) {
+        console.log("[bridge-ui] 1s elapsed with no fileKey — re-sending ui-ready");
+        parent.postMessage(
+          { pluginMessage: { type: "ui-ready" } },
+          "*"
+        );
+      }
+    }, 1000);
+    return () => window.clearTimeout(t);
+  }, [status.fileKey]);
 
   const connect = useCallback(() => {
     if (socketRef.current) {
@@ -225,6 +312,7 @@ export function useWebSocket(): UseWebSocketReturn {
       pluginVersion: PLUGIN_VERSION,
       secret: SECRET,
     });
+    console.log("[bridge-ui] connect() called, fileKey=", status.fileKey, "fileName=", status.fileName);
     const ws = new WebSocket(`${WS_BASE_URL}?${params.toString()}`);
     socketRef.current = ws;
 
@@ -268,6 +356,19 @@ export function useWebSocket(): UseWebSocketReturn {
 
       if (!isServerMessage(parsed)) return;
 
+      if (parsed.type === "__server_ping") {
+        // Application-level keepalive. Browser WebSockets don't reply to
+        // TCP pings, so the server sends JSON pings; we respond here.
+        if (ws.readyState === WebSocket.OPEN) {
+          try {
+            ws.send(JSON.stringify({ type: "__client_pong" }));
+          } catch {
+            // socket is closing, will reconnect via onclose
+          }
+        }
+        return;
+      }
+
       if (parsed.type === "__bridge_event") {
         if (parsed.event === "files" && Array.isArray(parsed.files)) {
           setOpenFiles(parsed.files.length);
@@ -308,7 +409,7 @@ export function useWebSocket(): UseWebSocketReturn {
         status: "pending",
       });
 
-      if (typeof parsedObj.id === "string") {
+      if (requestId) {
         parent.postMessage(
           { pluginMessage: { type: "server-request", payload: parsed } },
           "*"
@@ -333,14 +434,27 @@ export function useWebSocket(): UseWebSocketReturn {
     attemptRef.current = 0;
     clearError();
     if (status.fileKey) {
+      connectedFileKeyRef.current = ""; // bypass dedup so the click actually reconnects
       connect();
     }
   }, [status.fileKey, connect, clearError]);
 
+  // Connect on fileKey transition from empty → non-empty. We intentionally
+  // do NOT close the socket on re-render: the main thread re-sends
+  // plugin-status after every ui-ready, which would re-fire this effect
+  // and tear down an otherwise-healthy connection.
   useEffect(() => {
-    if (status.fileKey) {
-      connect();
+    if (!status.fileKey) {
+      connectedFileKeyRef.current = "";
+      return;
     }
+    if (connectedFileKeyRef.current === status.fileKey) return;
+    connectedFileKeyRef.current = status.fileKey;
+    connect();
+  }, [connect, status.fileKey]);
+
+  // On unmount only — close the socket.
+  useEffect(() => {
     return () => {
       if (reconnectTimerRef.current !== null) {
         window.clearTimeout(reconnectTimerRef.current);
@@ -351,7 +465,7 @@ export function useWebSocket(): UseWebSocketReturn {
         socketRef.current = null;
       }
     };
-  }, [connect, status.fileKey]);
+  }, []);
 
   return {
     connected,

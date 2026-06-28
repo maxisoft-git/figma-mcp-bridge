@@ -91,7 +91,8 @@ export type RequestType =
   | "import_design_tokens"
   | "find_nodes_by_variable"
   | "storybook_import"
-  | "spec_import";
+  | "spec_import"
+  | "export_icon_sprite";
 
 export type ServerRequest = {
   type: RequestType;

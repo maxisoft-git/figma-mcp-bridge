@@ -16,6 +16,7 @@ import {
   toolInputSchemas,
 } from "./schema.js";
 import type { BridgeResponse } from "./types.js";
+import { buildSprite, type IconInput } from "./sprite.js";
 
 type ToolResult = {
   content: Array<{ type: "text"; text: string }>;
@@ -1081,6 +1082,115 @@ export function registerTools(server: McpServer, node: Node, port: number): void
       return renderResponse(() =>
         node.sendWithParams("spec_import", undefined, params, fileKey)
       );
+    }
+  );
+
+  server.tool(
+    "export_icon_sprite",
+    "Find SVG icons across the file, deduplicate them, and write a single sprite.svg to disk. Useful for shipping a complete icon set to web/app consumers. Returns a summary of how many icons were found vs collapsed into the final sprite.",
+    toolInputSchemas.export_icon_sprite.shape,
+    async (rawArgs): Promise<ToolResult> => {
+      const args = rawArgs as {
+        outputPath: string;
+        scope?: "page" | "selection" | "document";
+        pageId?: string;
+        namePattern?: string;
+        sizeFilter?: { width: number; tolerance?: number };
+        includeHidden?: boolean;
+        maxIcons?: number;
+        dedupeMode?: "raw" | "normalized" | "paths";
+        spriteFormat?: "symbol" | "g";
+        fillStrategy?: "currentColor" | "preserve" | "black";
+        fileKey?: string;
+      };
+
+      const {
+        outputPath,
+        fileKey,
+        dedupeMode,
+        spriteFormat,
+        fillStrategy,
+        ...pluginParams
+      } = args;
+
+      let resolvedPath: string;
+      try {
+        resolvedPath = resolveAndValidateOutputPath(outputPath, process.cwd());
+      } catch (err) {
+        return {
+          content: [{ type: "text", text: err instanceof Error ? err.message : String(err) }],
+          isError: true,
+        };
+      }
+
+      const pluginArgs: Record<string, unknown> = { ...pluginParams };
+      // Empty namePattern disables the filter on the plugin side (it falls
+      // back to the default if undefined — so we pass empty string).
+      if (args.namePattern !== undefined) pluginArgs.namePattern = args.namePattern;
+
+      const resp = await node.sendWithParams(
+        "export_icon_sprite",
+        undefined,
+        pluginArgs,
+        fileKey,
+      );
+      if (resp.error) {
+        return { content: [{ type: "text", text: resp.error }], isError: true };
+      }
+
+      const data = resp.data as {
+        scope: string;
+        totalFound: number;
+        truncated: boolean;
+        icons: IconInput[];
+      };
+      const result = buildSprite(data.icons ?? [], {
+        dedupeMode,
+        spriteFormat,
+        fillStrategy,
+      });
+
+      try {
+        await mkdir(path.dirname(resolvedPath), { recursive: true });
+      } catch (err) {
+        return {
+          content: [{ type: "text", text: `Failed to create output directory: ${(err as Error).message}` }],
+          isError: true,
+        };
+      }
+
+      try {
+        await writeFile(resolvedPath, result.sprite, { flag: "wx" });
+      } catch (err) {
+        if (isNodeError(err) && err.code === "EEXIST") {
+          return {
+            content: [{ type: "text", text: `File already exists at outputPath: ${resolvedPath}` }],
+            isError: true,
+          };
+        }
+        return {
+          content: [{ type: "text", text: (err as Error).message }],
+          isError: true,
+        };
+      }
+
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify({
+              scope: data.scope,
+              totalFound: result.totalFound,
+              uniqueIcons: result.uniqueIcons,
+              duplicatesRemoved: result.duplicatesRemoved,
+              truncated: data.truncated,
+              outputPath: resolvedPath,
+              bytesWritten: Buffer.byteLength(result.sprite, "utf8"),
+              groups: result.groups,
+            }),
+          },
+        ],
+      };
     }
   );
 }

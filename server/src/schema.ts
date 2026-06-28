@@ -1012,6 +1012,56 @@ export const toolInputSchemas = {
   }).describe(
     "Create a Figma component from a declarative spec. Designed for high-level UI descriptions like 'a row with a title and a button'. Supports 'row', 'column', 'text', 'button', 'input', 'rect' primitives with auto-layout."
   ),
+  export_icon_sprite: z.object({
+    outputPath: z
+      .string()
+      .min(1)
+      .describe("File path to write the SVG sprite to. Relative paths resolve from the MCP server working directory. Refuses to overwrite existing files."),
+    scope: z
+      .enum(["page", "selection", "document"])
+      .optional()
+      .describe("Where to look for icons. 'page' (default) scans the current page or the page given by pageId; 'selection' scans the current selection; 'document' scans every page."),
+    pageId: figmaNodeId
+      .optional()
+      .describe("Required when scope='page' and you want to target a specific page. Defaults to figma.currentPage."),
+    namePattern: z
+      .string()
+      .optional()
+      .describe("RegExp source applied to node.name. Default: /^(icon|ic[-_\\/])/i (case-insensitive). Empty string disables the filter."),
+    sizeFilter: z
+      .object({
+        width: z.number().positive().describe("Expected width in px."),
+        tolerance: z.number().nonnegative().optional().describe("Allowed deviation in px (default 1)."),
+      })
+      .optional()
+      .describe("Only include icons whose width and height match `width` within `tolerance`. Use this to grab a specific grid (e.g. 24x24 only)."),
+    includeHidden: z
+      .boolean()
+      .optional()
+      .describe("Include hidden nodes (visible === false). Default false."),
+    maxIcons: z
+      .number()
+      .int()
+      .min(1)
+      .max(10000)
+      .optional()
+      .describe("Safety cap on candidates collected. Default 1000."),
+    dedupeMode: z
+      .enum(["raw", "normalized", "paths", "none"])
+      .optional()
+      .describe("How to decide two icons are duplicates. 'normalized' (default) strips paint attributes so black/white variants collapse; 'raw' treats every byte as distinct; 'paths' hashes only <path d=…> data; 'none' disables dedup entirely and emits one sprite per icon (with auto-numbered names on collision)."),
+    spriteFormat: z
+      .enum(["symbol", "g"])
+      .optional()
+      .describe("Output container. 'symbol' (default) generates <symbol id viewBox>; 'g' generates flat <g id>."),
+    fillStrategy: z
+      .enum(["currentColor", "preserve", "black"])
+      .optional()
+      .describe("How to set fill on exported paths. 'currentColor' (default) makes icons themeable; 'preserve' keeps the original Figma fill; 'black' forces #000."),
+    fileKey: fileKeyField,
+  }).describe(
+    "Find SVG icons across the file, deduplicate them, and write a single sprite.svg to disk. Returns a summary of how many icons were found vs collapsed into the final sprite."
+  ),
 } as const;
 
 type ToolName = keyof typeof toolInputSchemas;
@@ -1105,6 +1155,7 @@ const rpcToArgs: Record<
   find_nodes_by_variable: (_nodeIds, params) => params,
   storybook_import: (_nodeIds, params) => params,
   spec_import: (_nodeIds, params) => params,
+  export_icon_sprite: (_nodeIds, params) => params,
 };
 
 /**

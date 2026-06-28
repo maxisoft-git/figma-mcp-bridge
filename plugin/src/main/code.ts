@@ -114,12 +114,34 @@ const handleDevModeExport = async (
 figma.showUI(__html__, { width: 460, height: 560 });
 sendStatus();
 
+// Persist a debug trail we can inspect from the terminal to diagnose
+// handshake problems.
+const debugLog: string[] = [];
+const debugPush = (entry: string): void => {
+  debugLog.push(`[${new Date().toISOString()}] ${entry}`);
+  if (debugLog.length > 50) debugLog.shift();
+  figma.clientStorage.setAsync("bridge-debug", JSON.stringify(debugLog));
+};
+debugPush("plugin started, sendStatus() called");
+
+// Backup: if no ui-ready arrives within 2s, re-send status. This covers
+// the case where the very first sendStatus() is dropped (UI listener not
+// yet mounted) and the UI's own handshake on-mount effect also failed.
+const statusRetry = setTimeout(() => {
+  debugPush("2s elapsed, no ui-ready — re-sending status");
+  sendStatus();
+}, 2000);
+
 figma.on("selectionchange", () => {
+  debugPush("selectionchange — re-sending status");
   sendStatus();
 });
 
 figma.ui.onmessage = async (message: { type: string; [key: string]: unknown }) => {
+  debugPush(`ui->main message: type=${message.type}`);
   if (message.type === "ui-ready") {
+    clearTimeout(statusRetry);
+    debugPush("ui-ready received — sending status");
     sendStatus();
     return;
   }
@@ -143,6 +165,22 @@ figma.ui.onmessage = async (message: { type: string; [key: string]: unknown }) =
       message as unknown as DevModeExportRequest,
     );
     figma.ui.postMessage(result);
+    return;
+  }
+
+  if (message.type === "ui-resize") {
+    // UI asked the iframe to grow/shrink so the plugin takes less canvas
+    // space. Min 460×56 (just the header bar) — Figma clamps the height
+    // to a positive integer and enforces a 50px minimum.
+    const collapsed = message.collapsed === true;
+    const width = 460;
+    const height = collapsed ? 56 : 560;
+    try {
+      figma.ui.resize(width, height);
+      debugPush(`ui-resize: collapsed=${collapsed} → ${width}×${height}`);
+    } catch (err) {
+      debugPush(`ui-resize failed: ${(err as Error).message}`);
+    }
     return;
   }
 };

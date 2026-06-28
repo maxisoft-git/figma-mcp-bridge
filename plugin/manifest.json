@@ -2,6 +2,7 @@
   "name": "Figma MCP Bridge",
   "id": "figma-mcp-bridge",
   "api": "1.0.0",
+  "enablePrivatePluginApi": true,
   "main": "dist/code.js",
   "ui": "dist/index.html",
   "permissions": [],

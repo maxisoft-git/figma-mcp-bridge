@@ -108,9 +108,45 @@ export class Bridge {
     this.broadcastFiles();
     this.sendServerVersion(ws);
 
+    // Application-level keepalive. Browsers don't respond to TCP pings
+    // so we use a JSON ping/pong pair. Figma's iframe is sometimes
+    // destroyed (Livegraph reload, panel close) without sending a
+    // WebSocket close frame, leaving us with a half-open TCP socket
+    // that never delivers responses. If we don't see a pong for 15s
+    // we treat the connection as dead.
+    let lastPongAt = Date.now();
+    const PING_INTERVAL_MS = 5_000;
+    const PONG_TIMEOUT_MS = 15_000;
+    const pingTimer = setInterval(() => {
+      if (ws.readyState !== WebSocket.OPEN) {
+        clearInterval(pingTimer);
+        return;
+      }
+      if (Date.now() - lastPongAt > PONG_TIMEOUT_MS) {
+        console.error(`Plugin pong timeout for ${fileName} (${normalizedFileKey}) — closing`);
+        try {
+          ws.terminate();
+        } catch {
+          // ignore
+        }
+        clearInterval(pingTimer);
+        return;
+      }
+      try {
+        ws.send(JSON.stringify({ type: "__server_ping", ts: Date.now() }));
+      } catch {
+        // socket will close on its own
+      }
+    }, PING_INTERVAL_MS);
+
     ws.on("message", (data) => {
       try {
-        const resp: BridgeResponse = JSON.parse(data.toString());
+        const parsed = JSON.parse(data.toString()) as Record<string, unknown>;
+        if (parsed && parsed.type === "__client_pong") {
+          lastPongAt = Date.now();
+          return;
+        }
+        const resp = parsed as unknown as BridgeResponse;
         const pending = this.pending.get(resp.requestId);
         if (pending) {
           clearTimeout(pending.timeout);
@@ -122,22 +158,21 @@ export class Bridge {
       }
     });
 
-    ws.on("close", () => {
+    const cleanup = (): void => {
+      clearInterval(pingTimer);
       const current = this.connections.get(fileKey);
       if (current?.ws === ws) {
         this.connections.delete(fileKey);
         console.error(`Plugin disconnected: ${fileName} (${fileKey})`);
         this.broadcastFiles();
       }
-    });
+    };
+
+    ws.on("close", cleanup);
 
     ws.on("error", (err) => {
       console.error("WebSocket error:", err.message);
-      const current = this.connections.get(fileKey);
-      if (current?.ws === ws) {
-        this.connections.delete(fileKey);
-        this.broadcastFiles();
-      }
+      cleanup();
     });
   }
 

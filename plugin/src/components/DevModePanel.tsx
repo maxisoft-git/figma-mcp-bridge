@@ -47,6 +47,7 @@ export function DevModePanel() {
   }, [activeTab]);
 
   useEffect(() => {
+    let lastSelectionCount = -1;
     const handleMessage = (event: MessageEvent) => {
       const msg = event.data?.pluginMessage;
       if (!msg) return;
@@ -70,10 +71,16 @@ export function DevModePanel() {
       }
 
       // 2. Selection changed in Figma → main thread sends updated
-      //    plugin-status. Re-export the active tab so the preview stays
-      //    in sync without a manual click.
+      //    plugin-status. Re-export the active tab ONLY when the
+      //    selection count actually changed — otherwise every ui-ready
+      //    reply (mount + 1s backup + 2s main-thread backup) would
+      //    trigger a fresh node.exportAsync.
       if (msg.type === "plugin-status") {
-        requestExport(activeTabRef.current);
+        const sc = (msg.payload as { selectionCount?: number })?.selectionCount;
+        if (typeof sc === "number" && sc !== lastSelectionCount) {
+          lastSelectionCount = sc;
+          requestExport(activeTabRef.current);
+        }
       }
     };
 

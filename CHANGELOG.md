@@ -1,3 +1,7 @@
+## [0.12.0] — 2026-06-27
+
+### Changes
+- 
 ## [0.11.0] — 2026-06-27
 
 ### Changes
@@ -22,6 +26,100 @@
 
 ### Changes
 - 
+# Changelog
+
+## [Unreleased] — Sprite export, plugin UI overhaul, documentation
+
+### New: `export_icon_sprite` tool
+
+Find SVG icons across the file, deduplicate them, and write a single `<symbol>`-based sprite to disk.
+
+- **Input:** `outputPath`, `scope` (`page` / `selection` / `document`), `namePattern` (regex, default `/^(icon|ic[-_/])/i`), `sizeFilter`, `includeHidden`, `maxIcons` (default 1000), `dedupeMode` (`raw` / `normalized` / `paths` / `none`), `spriteFormat` (`symbol` / `g`), `fillStrategy` (`currentColor` / `preserve` / `black`).
+- **Dedupe modes**:
+  - `raw` — byte-for-byte comparison.
+  - `normalized` (default) — strips `fill` / `stroke` / `style` / `class` / `id` / dimensions / whitespace before comparison. Two visually identical icons collapse.
+  - `paths` — hashes only the `d` attribute of each `<path>`. Two icons with different wrappers but the same path geometry collapse.
+  - `none` — no dedup. Every candidate becomes its own `<symbol>`. Names with collisions get auto-numbered (`-2`, `-3`, …). Useful when you want to inspect the file as-is and dedup yourself later.
+- **Returns:** `{ scope, totalFound, uniqueIcons, duplicatesRemoved, truncated, outputPath, bytesWritten, groups: [{ spriteId, count, nodeIds, keptNodeId, keptName, width, height }] }`.
+- Standalone equivalent (no AI client required): `node scripts/export-via-rpc.mjs --fileKey … --out ./icons.svg --pattern "hugeicons|solar" --max 1000`. Uses `dedupeMode: "none"` and writes to disk directly.
+
+### Plugin UI: collapse / expand
+
+- New `ui-resize` message type — UI sends to main thread, main thread calls `figma.ui.resize(460, 56)` (collapsed) or `figma.ui.resize(460, 560)` (expanded).
+- New collapse button (▼/▲) in the header.
+- State persisted in `localStorage` under `bridge-ui-collapsed` — survives plugin reload.
+- New hotkey **`B`** to toggle.
+- New icons added to the inlined icon set: `chevron-up`, `chevron-down`.
+
+### Plugin / server: bug fixes from the connection saga
+
+These were the bugs that initially prevented any MCP tool call from returning a response. All fixed.
+
+1. **Manifest:** added `enablePrivatePluginApi: true` so `figma.fileKey` returns the real key (not the file-name fallback) in development plugins.
+2. **Message wrapper:** the original `isPluginMessagePayload` required the legacy `{type: "pluginMessage", pluginMessage: …}` Figma wrapper. Newer Figma Beta versions use `{pluginMessage: …, pluginId: …}` with no `type` field. The guard is now permissive: any object with a `pluginMessage.type` string is treated as a plugin message.
+3. **WS re-fire loop:** the original `useEffect` with `[connect, status.fileKey]` deps closed the WebSocket on every re-render. Fixed by tracking the last connected `fileKey` in a ref and only firing `connect()` on actual transitions. The `setStatus` reducer also bails out early when no values changed, so `plugin-status` echoes no longer cause re-fires.
+4. **Request forwarding:** the original UI ws.onmessage only forwarded when `parsedObj.id` was a string. The server actually sends `requestId`, so requests were never forwarded. Now forwards on `requestId`.
+5. **Response forwarding:** the UI message handler only matched the literal `inner.type === "server-request"` case for forwarding back. Plugin responses have the original request type (e.g. `"get_metadata"`) so they were dropped. Now any plugin message with a `requestId` string is forwarded to the server.
+6. **DevModePanel re-export storm:** it re-ran the active Dev Mode export on every `plugin-status` echo. Now only re-exports when `selectionCount` actually changes.
+7. **WebSocket half-open:** Figma reloads the iframe without sending a close frame. Added application-level `__server_ping` / `__client_pong` keepalive (5s interval, 15s timeout) so the leader evicts dead connections promptly.
+
+### Server: leader / follower hardening
+
+- `ALLOWED_ORIGINS_INCLUDE_NULL=1` is the documented requirement for Figma desktop. The `null` origin is intentional and required.
+- Graceful drain on SIGINT/SIGTERM: rejects new RPC, waits up to `DRAIN_TIMEOUT_MS` (default 10s) for in-flight requests, then exits.
+- Per-IP rate limiter on `/rpc` (configurable via `RATE_LIMIT_RPC_DISABLE=1`).
+- 5s response cache for read-only tools (`get_node`, `get_document`, `get_metadata`, etc.). Errors are not cached.
+
+### Documentation
+
+New `docs/` tree with parallel English and Russian versions:
+
+- `README.md` — rewritten in English with hero image (`./logo.png`), full quick-start, architecture diagram, example calls.
+- `docs/en/README.md` + `docs/en/{plugin,server,tools,architecture}.md` — 4 deep-dive English docs.
+- `docs/ru/README.md` + `docs/ru/{plugin,server,tools,architecture}.md` — 4 deep-dive Russian docs (mirrored).
+- Old internal plans (`PLUGIN_PLAN.md`, `SERVER_PLAN.md`, `DESIGN_SYSTEM_PLAN.md`, `docs/PLUGIN_ROADMAP.md`, `docs/SERVER_ROADMAP.md`, `docs/TOOL_MAPPING.md`) removed — superseded by the public docs.
+
+### Cleanup
+
+- `.gitignore` updated: `bun.lockb` (Bun's binary lock), `icons-*.svg` / `sprite-*.svg` / `test-*.mjs` / `test-*.svg` (script outputs), editor backups, coverage output.
+- `plugin/bun.lockb` untracked (the text `bun.lock` is the canonical lock).
+- Old `server/yarn.lock` reverted to upstream (we use `npm` for the server, not yarn).
+
+### Standalone scripts
+
+- `scripts/export-via-rpc.mjs` — direct-bridge sprite exporter. Connects to the WebSocket, fetches icons, writes the sprite. Doesn't require the AI client to be connected.
+- `scripts/bump-version.sh` — pre-existing, kept.
+
+---
+
+## [0.12.0] — 2026-06-27
+
+### Changes
+-
+## [0.11.0] — 2026-06-27
+
+### Changes
+-
+## [0.10.0] — 2026-06-27
+
+### Changes
+-
+## [0.9.0] — 2026-06-27
+
+### Changes
+-
+## [0.8.0] — 2026-06-27
+
+### Changes
+-
+## [0.7.0] — 2026-06-27
+
+### Changes
+-
+## [0.6.0] — 2026-06-26
+
+### Changes
+-
 # Changelog
 
 ## [Unreleased] — Dev Mode Mirror integration

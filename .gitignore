@@ -188,3 +188,23 @@ server/dist/
 # Package lock files (use bun for plugin)
 server/package-lock.json
 plugin/package-lock.json
+
+# Bun's binary lock cache (text bun.lock is enough for reproducibility)
+plugin/bun.lockb
+
+# Test artifacts and runtime outputs from scripts/
+icons-*.svg
+sprite-*.svg
+test-*.mjs
+test-*.svg
+/tmp/figma-mcp-bridge.log
+
+# Editor backups
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Coverage
+coverage/
+.nyc_output/

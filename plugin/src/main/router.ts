@@ -92,6 +92,7 @@ import { handle as import_design_tokens } from "./handlers/import_design_tokens"
 import { handle as find_nodes_by_variable } from "./handlers/find_nodes_by_variable";
 import { handle as storybook_import } from "./handlers/storybook_import";
 import { handle as spec_import } from "./handlers/spec_import";
+import { handle as export_icon_sprite } from "./handlers/export_icon_sprite";
 
 type Handler = (request: ServerRequest) => Promise<PluginResponse>;
 
@@ -189,6 +190,7 @@ const handlers: Record<RequestType, Handler> = {
   find_nodes_by_variable,
   storybook_import,
   spec_import,
+  export_icon_sprite,
 };
 
 export const dispatch = async (

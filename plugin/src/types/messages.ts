@@ -49,6 +49,8 @@ export type LogEntry = {
 // Message protocol
 // =============================================================================
 
+export type ServerPing = { type: "__server_ping"; ts: number };
+
 export type BridgeEvent =
   | { type: "__bridge_event"; event: "files"; files: readonly unknown[] }
   | { type: "__bridge_event"; event: "server_version"; serverVersion: string };
@@ -61,7 +63,7 @@ export type ServerRequest = {
   [key: string]: unknown;
 };
 
-export type ServerMessage = BridgeEvent | ServerRequest;
+export type ServerMessage = ServerPing | BridgeEvent | ServerRequest;
 
 export type LockedErrorResponse = {
   type: string;
@@ -72,7 +74,9 @@ export type LockedErrorResponse = {
 export type PluginMessage =
   | { type: "ui-ready" }
   | { type: "server-request"; payload: ServerMessage }
-  | { type: "plugin-locked"; requestId: RequestId };
+  | { type: "plugin-locked"; requestId: RequestId }
+  | { type: "plugin-status"; payload: FileStatus }
+  | { type: "ui-resize"; collapsed: boolean };
 
 // =============================================================================
 // Type guards
@@ -107,7 +111,13 @@ export const isServerMessage = (data: unknown): data is ServerMessage => {
 export const isPluginMessage = (data: unknown): data is PluginMessage => {
   if (typeof data !== "object" || data === null) return false;
   const d = data as Record<string, unknown>;
-  return d.type === "ui-ready" || d.type === "server-request" || d.type === "plugin-locked";
+  return (
+    d.type === "ui-ready" ||
+    d.type === "server-request" ||
+    d.type === "plugin-locked" ||
+    d.type === "plugin-status" ||
+    d.type === "ui-resize"
+  );
 };
 
 // =============================================================================
