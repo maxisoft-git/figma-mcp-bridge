@@ -260,25 +260,26 @@ bun run build       # vite (UI) + vite (main thread) → dist/
 
 Releases are tag-driven: push a `v*.*.*` tag and CI handles the rest.
 
-### One-time setup: npm Trusted Publishing
+### One-time setup: NPM_TOKEN in GitHub Secrets
 
-Trusted Publishing lets GitHub Actions publish to npm **without a token**. Configure it once at <https://www.npmjs.com/package/@maxisoft%2ffigma-mcp-bridge/access> → **Trusted Publishers** → **Add GitHub Actions**:
+1. Create a token at <https://www.npmjs.com/settings/<your-username>/tokens>:
+   - **Granular Access Token** (recommended): scope = `Read and Write` for `@maxisoft` package, expiry = as long as you want.
+   - **Legacy Automation Token** (works too, less granular): full account access.
+2. In your GitHub repo: **Settings → Secrets and variables → Actions → New repository secret**
+   - Name: `NPM_TOKEN`
+   - Value: paste the token
 
-- Repository: `maxisoft-git/figma-mcp-bridge`
-- Workflow filename: `publish.yml`
-- Environment name: *(leave blank)*
-
-That's the entire setup. No `NPM_TOKEN` secret, no 2FA prompts.
+That's the entire setup. CI picks it up automatically on the next tag push.
 
 ### Cutting a release
 
 ```bash
-# 1. Bump plugin version + commit + tag (server bumps separately on its own cycle)
+# 1. Bump plugin version + commit + tag
 ./scripts/bump-version.sh patch --commit        # creates v0.12.1 → use that tag below
 # OR, to bump everything:
 ./scripts/bump-version.sh patch --commit --server
 
-# 2. Push the tag
+# 2. Push
 git push origin main                                # CI runs tests + build on main
 git push origin v0.12.1                             # publish workflow fires
 ```
@@ -288,7 +289,7 @@ git push origin v0.12.1                             # publish workflow fires
 The `publish.yml` workflow runs:
 
 1. Builds the server (`tsc`), runs tests
-2. Publishes `@maxisoft/figma-mcp-bridge@0.12.1` to npm via Trusted Publishing
+2. Publishes `@maxisoft/figma-mcp-bridge@0.12.1` to npm using `NPM_TOKEN`
 3. Builds the plugin (`vite`)
 4. Packages `plugin/dist/` + `README.md` + `LICENSE.md` into a zip
 5. Creates a GitHub Release at the tag, attaches the zip
@@ -300,12 +301,20 @@ If you need to publish without pushing a tag — e.g. retry after a network glit
 1. GitHub → Actions → **Publish** → Run workflow → enter `1.0.0`
 2. The same job runs, just without creating a GitHub Release
 
+### Manual publish from your machine
+
+```bash
+cd /Volumes/Work/Repos/figma-mcp-bridge/server
+npm publish --access public --registry=https://registry.npmjs.org
+# If 2FA is enabled on the account, add --otp=123456
+```
+
 ### Workflow summary
 
 | File | Triggers on | What it does |
 |---|---|---|
 | `.github/workflows/ci.yml` | every push to `main`, every PR | install + test + build for both packages. Verifies the CLI shebang is preserved. Smoke-checks the standalone sprite exporter. |
-| `.github/workflows/publish.yml` | every `v*.*.*` tag, manual dispatch | publishes the server to npm (Trusted Publishing, no token), builds the plugin, creates a GitHub Release with a zip |
+| `.github/workflows/publish.yml` | every `v*.*.*` tag, manual dispatch | builds the server, publishes to npm using `NPM_TOKEN`, builds the plugin, creates a GitHub Release with a zip |
 
 ### Versioning
 

@@ -13,7 +13,7 @@ on:
 
 permissions:
   contents: write
-  id-token: write   # Required for npm Trusted Publishing (no NPM_TOKEN needed)
+  id-token: write   # Required for npm provenance (signed metadata)
 
 jobs:
   publish:
@@ -79,12 +79,12 @@ jobs:
 
       - name: Publish server to npm
         working-directory: server
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: npm publish --access public --provenance
-        # Trusted publishing — no NPM_TOKEN needed.
-        # Configure once at https://www.npmjs.com/package/@maxisoft-git%2ffigma-mcp-bridge/access
-        # → Trusted Publishers → Add GitHub Actions
-        #   Repository: maxisoft-git/figma-mcp-bridge
-        #   Workflow:   publish.yml
+        # Requires the NPM_TOKEN repo secret.
+        # Configure once: GitHub → Settings → Secrets and variables → Actions
+        #   → New repository secret → Name: NPM_TOKEN → Value: <token from npmjs.com>
 
       # ── Plugin: install + build ───────────────────────────────────────
 
