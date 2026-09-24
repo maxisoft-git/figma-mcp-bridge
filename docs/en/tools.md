@@ -159,7 +159,10 @@ Find every node bound to a given variable.
 
 ### `get_screenshot`
 
-Export a node as PNG, SVG, JPG, PDF, or WEBP, returned as a base64 string.
+Export a node as PNG, SVG, JPG, PDF, or WEBP. Raster formats come back as MCP
+`image` content — the client feeds them to the model as vision input, so no
+base64 ever enters the context window. SVG comes back as its text source, PDF
+as metadata only (use `save_screenshots` to get PDF bytes on disk).
 
 **Input:**
 
@@ -169,7 +172,8 @@ Export a node as PNG, SVG, JPG, PDF, or WEBP, returned as a base64 string.
 | `format` | `"PNG"` \| `"SVG"` \| `"JPG"` \| `"PDF"` \| `"WEBP"` | `"PNG"` |
 | `scale` | number | `2` (ignored for SVG) |
 
-**Returns:** `[{ nodeId, nodeName, format, base64, width, height }]`
+**Returns:** one `image` part per exported node, then a JSON metadata line
+`[{ nodeId, nodeName, format, width, height, bytes }]`
 
 Figma cannot export webp, so a `WEBP` request is exported as PNG and re-encoded
 by the server with `cwebp` (libwebp), which must be on `PATH` — the error names
@@ -195,7 +199,7 @@ the extension is refused instead of writing the wrong bytes into the file.
 
 ### `get_image`
 
-Like `get_screenshot` but for image-bearing nodes. Returns `{ nodeId, nodeName, format, base64, scale, width, height }`; with `outputPath`, writes the file and returns metadata instead of base64.
+Like `get_screenshot` but for image-bearing nodes. Without `outputPath` the image comes back as MCP `image` content (SVG as text source, PDF as metadata only); with `outputPath`, writes the file and returns metadata only — never base64.
 
 **Input:** `{ nodeId, format?, scale?, backgroundOnly?, outputPath? }` (one node per call). As with `save_screenshots`, a bare `outputPath` extension picks the format, and `WEBP` is re-encoded server-side.
 

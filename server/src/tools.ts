@@ -29,8 +29,18 @@ import {
 } from "./export-format.js";
 import { encodeWebp } from "./webp.js";
 
+/**
+ * Raster exports travel as MCP `image` content so the client feeds them to
+ * the model as vision input; base64 in a text block measured ~20x more
+ * expensive (14 KB PNG = ~12k text tokens vs ~500 as an image) and megabyte
+ * payloads were truncated away by the client anyway.
+ */
+type ToolResultContent =
+  | { type: "text"; text: string }
+  | { type: "image"; data: string; mimeType: string };
+
 type ToolResult = {
-  content: Array<{ type: "text"; text: string }>;
+  content: ToolResultContent[];
   isError?: boolean;
 };
 
@@ -234,29 +244,37 @@ export function registerTools(server: McpServer, node: Node, port: number): void
 
   server.tool(
     "get_screenshot",
-    "Export a screenshot of the selected nodes or specific nodes by ID as PNG/SVG/JPG/PDF/WEBP. Returns base64-encoded image data; WEBP is encoded server-side from a PNG export and needs `cwebp` on PATH. When multiple files are connected, specify fileKey.",
+    "Export a screenshot of the selected nodes or specific nodes by ID as PNG/SVG/JPG/PDF/WEBP. Returns images as MCP image content (rendered by the client, never as base64 text), SVG as its text source and PDF as metadata only. WEBP is encoded server-side from a PNG export and needs `cwebp` on PATH. When multiple files are connected, specify fileKey.",
     toolInputSchemas.get_screenshot.shape,
     async ({ nodeIds, format, scale, fileKey }): Promise<ToolResult> => {
       const params: Record<string, unknown> = {};
       if (format) params.format = wireFormatFor(format);
       if (scale !== undefined && scale > 0) params.scale = scale;
-      return renderResponse(async () => {
+      try {
         const resp = await node.sendWithParams(
           "get_screenshot",
           nodeIds,
           params,
           fileKey
         );
-        if (resp.error || format !== "WEBP") return resp;
-        // The plugin exported PNG for this request; hand back webp instead.
-        return { ...resp, data: await reencodeExportsAsWebp(resp.data) };
-      });
+        if (resp.error) {
+          return { content: [{ type: "text", text: resp.error }], isError: true };
+        }
+        // The plugin exported PNG for a WEBP request; hand back webp instead.
+        const data = format === "WEBP" ? await reencodeExportsAsWebp(resp.data) : resp.data;
+        return { content: screenshotContent(data) };
+      } catch (err) {
+        return {
+          content: [{ type: "text", text: err instanceof Error ? err.message : String(err) }],
+          isError: true,
+        };
+      }
     }
   );
 
   server.tool(
     "get_image",
-    "Export a specific node as an image (PNG/SVG/JPG/PDF/WEBP). Set backgroundOnly to export only the background fill of a frame without its children. If outputPath is provided, saves the image to disk instead of returning base64, and its extension picks the format (WEBP is encoded server-side from a PNG export, needs `cwebp` on PATH). When multiple files are connected, specify fileKey.",
+    "Export a specific node as an image (PNG/SVG/JPG/PDF/WEBP). Set backgroundOnly to export only the background fill of a frame without its children. If outputPath is provided, saves the image to disk and returns only metadata; otherwise the image comes back as MCP image content (SVG as text source, PDF as metadata only). WEBP is encoded server-side from a PNG export and needs `cwebp` on PATH. When multiple files are connected, specify fileKey.",
     toolInputSchemas.get_image.shape,
     async ({ nodeId, format, scale, backgroundOnly, outputPath, fileKey }): Promise<ToolResult> => {
       try {
@@ -309,17 +327,11 @@ export function registerTools(server: McpServer, node: Node, port: number): void
           };
         }
 
-        const inlineBase64 =
-          resolvedFormat === "WEBP" && data.base64
-            ? (await encodeWebp(Buffer.from(data.base64, "base64"))).toString("base64")
-            : data.base64;
-
-        return {
-          content: [{
-            type: "text",
-            text: JSON.stringify({ ...data, format: resolvedFormat, base64: inlineBase64 }),
-          }],
-        };
+        if (resolvedFormat === "WEBP" && data.base64) {
+          const webp = (await encodeWebp(Buffer.from(data.base64, "base64"))).toString("base64");
+          return { content: screenshotContent({ ...data, format: "WEBP", base64: webp }) };
+        }
+        return { content: screenshotContent(data) };
       } catch (err) {
         return {
           content: [{ type: "text", text: err instanceof Error ? err.message : String(err) }],
@@ -1524,6 +1536,110 @@ function getSingleScreenshotExport(data: unknown): ScreenshotExport {
 
   const screenshot = first as ScreenshotExport;
   return screenshot;
+}
+
+/** MIME types for the raster formats an export can come back as. */
+const IMAGE_MIME_BY_FORMAT: Record<string, string> = {
+  PNG: "image/png",
+  JPG: "image/jpeg",
+  WEBP: "image/webp",
+};
+
+/**
+ * Converts a screenshot payload into MCP content parts.
+ *
+ * Raster exports become `image` content so the client passes them to the
+ * model as vision input — base64 inside a text block measured ~20x more
+ * expensive for the same picture, and multi-megabyte payloads were
+ * truncated by the client anyway, leaving the model blind. SVG comes back
+ * decoded (it is source, not a picture); PDF only as metadata, because it
+ * cannot be rendered inline and its base64 would blow up the context.
+ * @param data - `{ exports: [...] }` from get_screenshot or a single export from get_image.
+ * @returns One content part per export plus a trailing JSON metadata line.
+ */
+export function screenshotContent(data: unknown): ToolResultContent[] {
+  const entries = collectScreenshotExports(data);
+  const content: ToolResultContent[] = [];
+  const meta: unknown[] = [];
+
+  for (const entry of entries) {
+    if (entry.format === "SVG") {
+      content.push({
+        type: "text",
+        text: Buffer.from(entry.base64, "base64").toString("utf8"),
+      });
+    } else if (entry.format !== "PDF") {
+      content.push({
+        type: "image",
+        data: entry.base64,
+        mimeType: IMAGE_MIME_BY_FORMAT[entry.format] ?? "image/png",
+      });
+    }
+    meta.push({
+      nodeId: entry.nodeId,
+      nodeName: entry.nodeName,
+      format: entry.format,
+      width: entry.width,
+      height: entry.height,
+      bytes: Buffer.from(entry.base64, "base64").length,
+      ...(entry.format === "PDF"
+        ? {
+            note:
+              "PDF cannot be rendered inline; use get_image with outputPath to save it to disk",
+          }
+        : {}),
+    });
+  }
+
+  content.push({ type: "text", text: JSON.stringify(meta) });
+  return content;
+}
+
+/**
+ * Normalises the two screenshot payload shapes (`{ exports: [...] }` and a
+ * single export object) into a validated list.
+ * @param data - Payload from the plugin.
+ * @returns The exports it contains.
+ */
+function collectScreenshotExports(data: unknown): ScreenshotExport[] {
+  if (!data || typeof data !== "object") {
+    throw new Error("Invalid screenshot response from plugin");
+  }
+  const container = data as { exports?: unknown; base64?: unknown };
+  const list = Array.isArray(container.exports)
+    ? container.exports
+    : typeof container.base64 === "string"
+      ? [data]
+      : null;
+  if (!list || list.length === 0) {
+    throw new Error("No screenshot export returned by plugin");
+  }
+  return list.map((entry) => {
+    if (
+      !entry ||
+      typeof entry !== "object" ||
+      typeof (entry as { base64?: unknown }).base64 !== "string" ||
+      typeof (entry as { nodeId?: unknown }).nodeId !== "string"
+    ) {
+      throw new Error("Malformed screenshot export payload");
+    }
+    const e = entry as {
+      nodeId: string;
+      nodeName?: string;
+      format?: string;
+      base64: string;
+      width?: number;
+      height?: number;
+    };
+    return {
+      nodeId: e.nodeId,
+      nodeName: typeof e.nodeName === "string" ? e.nodeName : e.nodeId,
+      format: (e.format ?? "PNG") as ExportFormat,
+      base64: e.base64,
+      width: typeof e.width === "number" ? e.width : 0,
+      height: typeof e.height === "number" ? e.height : 0,
+    };
+  });
 }
 
 async function saveScreenshotItemToFile(

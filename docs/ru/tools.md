@@ -128,7 +128,10 @@
 
 ### `get_screenshot`
 
-Экспортировать ноду как PNG, SVG, JPG, PDF или WEBP, вернуть как base64.
+Экспортировать ноду как PNG, SVG, JPG, PDF или WEBP. Растр приходит как MCP
+`image`-контент — клиент отдаёт модели его как vision-вход, base64 в контекстное
+окно не попадает вообще. SVG приходит текстом (это исходник), PDF — только
+метаданными (байты PDF — через `save_screenshots` на диск).
 
 **Input:** `{ nodeIds?, format?, scale? }`
 
@@ -148,7 +151,7 @@ Figma не умеет экспортировать webp, поэтому запр
 
 ### `get_image`
 
-Для нод с изображениями. Возвращает `{ nodeId, nodeName, format, base64, scale, width, height }`; с `outputPath` — пишет файл и отдаёт метаданные вместо base64.
+Для нод с изображениями. Без `outputPath` — изображение как MCP `image`-контент (SVG текстом, PDF — метаданные); с `outputPath` — пишет файл и отдаёт только метаданные, без base64.
 
 **Input:** `{ nodeId, format?, scale?, backgroundOnly?, outputPath? }`. Как и в `save_screenshots`, расширение `outputPath` выбирает формат, а `WEBP` перекодируется на сервере.
 

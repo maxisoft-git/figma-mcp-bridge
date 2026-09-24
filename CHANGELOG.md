@@ -34,6 +34,18 @@
 
 ## [Unreleased] — Sprite export, plugin UI overhaul, documentation
 
+### Changed: `get_screenshot` / `get_image` return MCP image content
+
+Raster exports (PNG/JPG/WEBP) now travel as MCP `image` content instead of
+base64 inside a JSON text block, so clients render them as vision input and
+the base64 never enters the model's context window. Measured on real
+sessions: a 14 KB PNG cost ~11.7k text tokens as base64 versus ~540 as an
+image (~20x), and multi-megabyte exports were truncated by the client to a
+file-path notice, leaving the model blind. SVG comes back as decoded text
+source; PDF as metadata only (it cannot be rendered inline — use
+`get_image` + `outputPath`, or `save_screenshots`, to get PDF bytes on
+disk). `get_image` with `outputPath` is unchanged.
+
 ### New: `export_icon_sprite` tool
 
 Find SVG icons across the file, deduplicate them, and write a single `<symbol>`-based sprite to disk.
