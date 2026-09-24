@@ -1,5 +1,5 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, realpath, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import type { Node } from "./node.js";
 import { Follower } from "./follower.js";
@@ -7,6 +7,7 @@ import {
   createFrameInput,
   createImageInput,
   createPageInput,
+  importHtmlLayersInput,
   createShapeShape,
   createTextShape,
   createShapeInput,
@@ -27,6 +28,9 @@ type ToolResult = {
 };
 
 export type ExportFormat = "PNG" | "SVG" | "JPG" | "PDF";
+
+/** Largest html-figma layer-tree JSON the server will read from disk. */
+const MAX_LAYERS_JSON_BYTES = 16 * 1024 * 1024;
 
 export interface ScreenshotSender {
   sendWithParams(
@@ -422,6 +426,30 @@ export function registerTools(server: McpServer, node: Node, port: number): void
             { ...params, imageBase64 },
             fileKey
           )
+        );
+      } catch (err) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: err instanceof Error ? err.message : String(err),
+            },
+          ],
+          isError: true,
+        };
+      }
+    }
+  );
+
+  server.tool(
+    "import_html_layers",
+    "Import a DOM serialization (JSON produced by html-figma's browser htmlToFigma()) as editable Figma layers inside a new wrapper frame — frames, text, rectangles, and SVG vectors in one call. Source must be a JSON file path inside the MCP server working directory. Optionally append the wrapper into an existing frame/section via parentId. When multiple files are connected, specify fileKey.",
+    importHtmlLayersInput.shape,
+    async ({ source, fileKey, ...params }): Promise<ToolResult> => {
+      try {
+        const layers = await loadLayersJson(source, process.cwd());
+        return await renderResponse(() =>
+          node.sendWithParams("import_html_layers", undefined, { ...params, layers }, fileKey)
         );
       } catch (err) {
         return {
@@ -1351,6 +1379,55 @@ async function loadImageSourceAsBase64(
     throw new Error(`Image exceeds ${MAX_IMAGE_BYTES} bytes`);
   }
   return bytes.toString("base64");
+}
+
+/**
+ * Reads an html-figma layer tree from a JSON file inside the workspace.
+ *
+ * Symlinks are resolved before the containment check so a workspace-local link
+ * cannot point the read outside the working directory; the size is checked
+ * before the read so an oversized file is rejected without allocating it.
+ */
+async function loadLayersJson(
+  source: string,
+  workspaceRoot: string
+): Promise<Record<string, unknown>> {
+  const resolvedRoot = await realpath(path.resolve(workspaceRoot));
+  const lexicalPath = path.resolve(resolvedRoot, source);
+  let resolvedPath: string;
+  try {
+    resolvedPath = await realpath(lexicalPath);
+  } catch {
+    throw new Error(`Layers source not found: ${source}`);
+  }
+  const relativePath = path.relative(resolvedRoot, resolvedPath);
+  if (relativePath.startsWith("..") || path.isAbsolute(relativePath)) {
+    throw new Error(
+      `layers source must be inside the MCP server working directory: ${resolvedRoot}`
+    );
+  }
+  const info = await stat(resolvedPath);
+  if (!info.isFile()) {
+    throw new Error(`Layers source is not a regular file: ${source}`);
+  }
+  if (info.size > MAX_LAYERS_JSON_BYTES) {
+    throw new Error(`Layers JSON exceeds ${MAX_LAYERS_JSON_BYTES} bytes`);
+  }
+  const bytes = await readFile(resolvedPath);
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(bytes.toString("utf8"));
+  } catch {
+    throw new Error(`Layers source is not valid JSON: ${source}`);
+  }
+  // htmlToFigma() returns a single root LayerNode; tolerate a one-element array.
+  const root = Array.isArray(parsed) ? parsed[0] : parsed;
+  if (!root || typeof root !== "object" || typeof (root as { type?: unknown }).type !== "string") {
+    throw new Error(
+      "Layers JSON must be an html-figma LayerNode tree (object with a `type` field)"
+    );
+  }
+  return root as Record<string, unknown>;
 }
 
 function inferFormatFromPath(outputPath: string): ExportFormat | null {

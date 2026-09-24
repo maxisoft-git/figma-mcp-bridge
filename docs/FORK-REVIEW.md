@@ -17,7 +17,7 @@ what is worth porting into this fork (`@maxisoft/figma-mcp-bridge`).
 | `1218122` | stdin EOF + SIGHUP shutdown (#44) | **ported** (we already had stdin/EPIPE) |
 | `bef8e58` | `create_page` tool (#42) | **ported** |
 | `837f96e` | pre-commit hooks, prettier, root `package.json` | skipped (repo hygiene, not required) |
-| `734d4c1` | `import_html_layers` (#47) | TODO |
+| `734d4c1` | `import_html_layers` (#47) | **ported** |
 | `ef0cf04` | collapsible plugin window (#49) | already present (our `ui-resize`) |
 | `4b388cf` | sandbox build / typecheck / format repair (#55) | **partially ported** (`.gitattributes`, `vite-env.d.ts`) |
 | `e8db933` | `get_layout_tree` — absolute layout geometry (#50) | **ported** |
@@ -59,8 +59,10 @@ Most forks are silent snapshots. Ranked by unique work:
 - **P1 — ported**: `create_page`, `get_layout_tree`, `execute_code`
   (`eval-direct` + `script-result` + `script-runner`, tested); the realSeyed
   extension areas — sections, variables write, typography, components (25 tools).
-- **Still open**: `get_node` budget + serializer defaults, `import_html_layers`,
-  Motion API, WEBP/format inference, persistent cache.
+- **P1b — ported**: `import_html_layers` (upstream #47; vendored html-figma
+  renderer under `plugin/src/html-figma`, MIT — see its `NOTICE.md`).
+- **Still open**: `get_node` budget + serializer defaults, Motion API,
+  WEBP/format inference, persistent cache.
 - **P3 — open**: onboarding `setup.sh`, agent CLI, comments via REST,
   cross-machine leader.
 

@@ -4,6 +4,7 @@ export type RequestType =
   | "get_node"
   | "get_layout_tree"
   | "execute_code"
+  | "import_html_layers"
   | "get_styles"
   | "get_metadata"
   | "get_design_context"

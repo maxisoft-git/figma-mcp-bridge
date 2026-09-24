@@ -5,6 +5,7 @@ import { handle as get_selection } from "./handlers/get_selection";
 import { handle as get_node } from "./handlers/get_node";
 import { handle as get_layout_tree } from "./handlers/get_layout_tree";
 import { handle as execute_code } from "./handlers/execute_code";
+import { handle as import_html_layers } from "./handlers/import_html_layers";
 import { handle as get_styles } from "./handlers/get_styles";
 import { handle as get_metadata } from "./handlers/get_metadata";
 import { handle as get_design_context } from "./handlers/get_design_context";
@@ -107,6 +108,7 @@ const handlers: Record<RequestType, Handler> = {
   get_node,
   get_layout_tree,
   execute_code,
+  import_html_layers,
   get_styles,
   get_metadata,
   get_design_context,

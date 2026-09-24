@@ -18,7 +18,7 @@
 
 It consists of:
 
-1. **MCP Server** (`@maxisoft/figma-mcp-bridge`) — a Node.js process that implements the [Model Context Protocol](https://modelcontextprotocol.io/) and exposes **110 Figma-aware tools** to your AI agent.
+1. **MCP Server** (`@maxisoft/figma-mcp-bridge`) — a Node.js process that implements the [Model Context Protocol](https://modelcontextprotocol.io/) and exposes **111 Figma-aware tools** to your AI agent.
 2. **Figma Plugin** (private, in this repo) — a Figma plugin that runs inside the Figma sandbox, executes the tools against the real Figma document, and reports results back to the server over a local WebSocket.
 
 A side-channel WebSocket on `ws://localhost:1994` connects the two. There is no cloud service in the loop — everything happens on your machine.
@@ -29,7 +29,7 @@ Figma's public REST API is rate-limited (60 requests / minute per user), require
 
 ## Features
 
-- **110 tools** for reading, editing, and analysing Figma documents
+- **111 tools** for reading, editing, and analysing Figma documents
 - **Multi-file** — connect several Figma files at once, switch between them per tool call
 - **Dev Mode Mirror** — the plugin's own UI is a Dev Mode panel: pick a node, see its CSS/SVG/HTML/JSON/IMG exports side-by-side with the real Figma file
 - **Design tokens** — extract variables, paint styles, text styles, effect styles, grid styles as a structured manifest; re-apply them to another file
@@ -49,7 +49,7 @@ Figma's public REST API is rate-limited (60 requests / minute per user), require
 │   │ (Claude,   │   tools/call       │  @maxisoft/            │      │
 │   │  Cursor,   │   tools/list       │  figma-mcp-bridge      │      │
 │   │  Cline, …) │                    │                        │      │
-│   └────────────┘                    │  110 tools registered   │      │
+│   └────────────┘                    │  111 tools registered   │      │
 │        ▲                            │  leader/follower       │      │
 │        │                            │  election (1994)       │      │
 │        │ MCP tool call              │                        │      │
@@ -209,7 +209,7 @@ Output: a single `icons.svg` with one `<symbol id="…">` per icon (auto-numbere
 ├── server/              # MCP server (Node.js, published to npm)
 │   ├── src/
 │   │   ├── index.ts          # Entry point (MCP stdio + WebSocket on :1994)
-│   │   ├── tools.ts          # Registers 110 tools
+│   │   ├── tools.ts          # Registers 111 tools
 │   │   ├── schema.ts         # Zod schemas for every tool's input
 │   │   ├── bridge.ts         # WebSocket bridge (Figma plugin ↔ server)
 │   │   ├── leader.ts         # HTTP + WS upgrade on :1994

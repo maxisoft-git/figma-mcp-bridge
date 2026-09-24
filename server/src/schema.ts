@@ -261,6 +261,37 @@ export const createImageInput = z.object({
   fileKey: fileKeyField,
 });
 
+/**
+ * A serialized layer tree produced by html-figma's browser `htmlToFigma()`.
+ * Validated loosely here (the root must carry a node type); the plugin-side
+ * renderer is the authority on the full shape.
+ */
+const htmlLayerTree = z
+  .object({ type: z.string().min(1) })
+  .passthrough()
+  .describe("Root LayerNode of an html-figma serialization");
+
+export const importHtmlLayersInput = z.object({
+  source: z
+    .string()
+    .min(1)
+    .describe(
+      "Path to a JSON file containing an html-figma htmlToFigma() layer tree, relative to the MCP server cwd (absolute paths must stay inside it)."
+    ),
+  name: z
+    .string()
+    .optional()
+    .describe("Optional name for the wrapper frame (default: 'imported layers')"),
+  parentId: figmaNodeId
+    .optional()
+    .describe(
+      "Optional parent node ID (frame/section) to append the wrapper frame into. x/y become relative to that parent."
+    ),
+  x: z.number().optional().describe("Optional x position of the wrapper frame"),
+  y: z.number().optional().describe("Optional y position of the wrapper frame"),
+  fileKey: fileKeyField,
+});
+
 export const toolInputSchemas = {
   // Extension areas (variables / typography / components / sections). A core
   // entry below overrides an extension one with the same tool name.
@@ -425,6 +456,8 @@ export const toolInputSchemas = {
   create_shape: createShapeInput,
 
   create_image: createImageInput,
+
+  import_html_layers: importHtmlLayersInput,
 
   duplicate_nodes: z.object({
     nodeIds: z
@@ -1139,6 +1172,11 @@ const createImageRpcInput = createImageInput
 const rpcInputSchemas = {
   ...toolInputSchemas,
   create_image: createImageRpcInput,
+  // The handler resolves `source` (JSON file path) into the parsed tree before
+  // forwarding, so the wire carries `layers` and never `source`.
+  import_html_layers: importHtmlLayersInput.omit({ source: true, fileKey: true }).extend({
+    layers: htmlLayerTree,
+  }),
 } as const;
 
 /**
@@ -1173,6 +1211,7 @@ const rpcToArgs: Record<
   create_text: (_nodeIds, params) => ({ ...params }),
   create_shape: (_nodeIds, params) => ({ ...params }),
   create_image: (_nodeIds, params) => ({ ...params }),
+  import_html_layers: (_nodeIds, params) => ({ ...params }),
   duplicate_nodes: (nodeIds, params) => ({ nodeIds, ...params }),
   reparent_nodes: (nodeIds, params) => ({ nodeIds, ...params }),
   delete_nodes: (nodeIds, params) => ({ nodeIds, ...params }),

@@ -1,6 +1,6 @@
 # Tool reference
 
-110 tools, organised by what they do. Every tool:
+111 tools, organised by what they do. Every tool:
 
 - Has a unique name (e.g. `get_node`)
 - Takes a Zod-validated object as input
@@ -270,7 +270,7 @@ Every write tool takes `{ nodeId | nodeIds, …args }` and returns the previous 
 
 | Tool | Effect |
 |---|---|
-| `batch_mutation` | Apply many small mutations in a single call (faster than 110 separate tool calls; supports per-node param resolution via `tmp:` references) |
+| `batch_mutation` | Apply many small mutations in a single call (faster than 111 separate tool calls; supports per-node param resolution via `tmp:` references) |
 | `update_component_instances` | Push master changes to all instances of a component |
 | `bulk_rename` | Rename nodes by regex pattern, with optional scope (page / selection / sub-tree) |
 | `bulk_swap_text` | Replace text on multiple nodes at once |
@@ -386,12 +386,14 @@ The standalone script uses `dedupeMode: "none"` and writes to disk directly. Use
 ## Extension tools
 
 Beyond the core set above, the bridge ships an extension surface ported from
-the `realSeyed/figma-mcp-bridge` fork (MIT). These are grouped by area:
+upstream and the `realSeyed/figma-mcp-bridge` fork (MIT). These are grouped by
+area:
 
 | Tool | What it does |
 |---|---|
 | `get_layout_tree` | Absolute transforms and bounds for every node under a capture root (read-only geometry, separate from screenshots). |
 | `create_page` | Create a page, optionally name it and switch to it. Returns its ID for use as a `parentId`. |
+| `import_html_layers` | Import an html-figma `htmlToFigma()` layer-tree JSON as editable layers inside a new wrapper frame (frames, text, rects, SVG). Source is a JSON file inside the server cwd. |
 | `execute_code` | Run JavaScript in the plugin sandbox against the Figma Plugin API — an escape hatch for anything the other tools do not cover. Writes are real. |
 | `list_sections` / `get_section` | List sections (with page, parent section, child count) and read one (children, real content bounds, overflow). |
 | `create_section` | Create a section, empty at a size or wrapping existing nodes while keeping them in place. |
