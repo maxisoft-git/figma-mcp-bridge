@@ -35,6 +35,8 @@ Figma's public REST API is rate-limited (60 requests / minute per user), require
 - **Design tokens** — extract variables, paint styles, text styles, effect styles, grid styles as a structured manifest; re-apply them to another file
 - **Style + lock** — soft-lock the plugin from the UI so the agent can't accidentally mutate it
 - **WebSocket keepalive** — application-level `__server_ping` / `__client_pong` pair detects half-open TCP connections that the OS can't notice (Figma reloads the iframe without sending a close frame)
+- **Bounded node reads** — `get_node` honours `depth` and cuts a subtree larger than 50 000 characters, reporting `truncated` and `childCount` where it stopped instead of flooding the context
+- **WEBP exports** — `get_screenshot`, `save_screenshots` and `get_image` take `WEBP` (re-encoded server-side from a PNG export via `cwebp`), and a bare `outputPath` extension is enough to choose the format
 - **Standalone sprite exporter** — `scripts/export-via-rpc.mjs` dumps every SVG icon in the file to a single `<symbol>`-based sprite, with no dedup (you choose how to collapse)
 - **No telemetry**, no analytics, no phoning home
 
@@ -239,6 +241,7 @@ Output: a single `icons.svg` with one `<symbol id="…">` per icon (auto-numbere
 - Node.js **20+** (see `.nvmrc` — currently 24)
 - Figma desktop **or** Figma web
 - One MCP-compatible AI client (Claude Desktop, Claude Code, Cursor, Cline, Windsurf, …)
+- Optional: `cwebp` (libwebp) on `PATH` for `WEBP` exports — `brew install webp`, `apt install webp`
 
 ## Building from source
 

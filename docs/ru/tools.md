@@ -68,6 +68,13 @@
 | `includeImageData` | boolean | `false` | Inline base64 картинки |
 | `enrich` | boolean | `false` | Резолвить стили |
 
+Чтение ограничено: поддерево больше 50 000 символов вернётся обрезанным там, где
+закончился бюджет, с `truncated: true` и `note`. Нода, на которой обход
+остановился, несёт `childCount` рядом с теми `children`, которые успели войти:
+по этой цифре видно, сколько ещё осталось — их читает повторный вызов `get_node`
+для этой ноды или `get_design_context` с `depth`. Параметр `depth` соблюдается, и
+при его достижении вместо детей отдаётся `childCount`.
+
 **Пример:**
 
 ```json
@@ -121,9 +128,13 @@
 
 ### `get_screenshot`
 
-Экспортировать ноду как PNG, SVG, JPG или PDF, вернуть как base64.
+Экспортировать ноду как PNG, SVG, JPG, PDF или WEBP, вернуть как base64.
 
 **Input:** `{ nodeIds?, format?, scale? }`
+
+Figma не умеет экспортировать webp, поэтому запрос `WEBP` экспортируется как PNG
+и перекодируется сервером через `cwebp` (libwebp) — бинарник должен быть в
+`PATH`; если его нет, в тексте ошибки указано, как поставить.
 
 ### `save_screenshots`
 
@@ -131,9 +142,15 @@
 
 `outputPath` относительно CWD MCP-сервера. Сервер отказывается писать за пределы этой директории.
 
+Если `format` не задан, формат выбирается по расширению `outputPath`
+(`.png`, `.svg`, `.jpg`/`.jpeg`, `.pdf`, `.webp`). Если `format` противоречит
+расширению — вызов отклоняется, а не пишет не те байты в файл.
+
 ### `get_image`
 
-Для нод с изображениями. Возвращает `{ mime, base64, source, scaleMode, bytes }`.
+Для нод с изображениями. Возвращает `{ nodeId, nodeName, format, base64, scale, width, height }`; с `outputPath` — пишет файл и отдаёт метаданные вместо base64.
+
+**Input:** `{ nodeId, format?, scale?, backgroundOnly?, outputPath? }`. Как и в `save_screenshots`, расширение `outputPath` выбирает формат, а `WEBP` перекодируется на сервере.
 
 ### `save_node_json`
 

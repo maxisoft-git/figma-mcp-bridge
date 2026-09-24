@@ -1,6 +1,10 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { vi } from "vitest";
-import { serializeNode } from "./serializer";
+import {
+  MAX_NODE_RESULT_CHARS,
+  serializeNode,
+  serializeNodeWithinBudget,
+} from "./serializer";
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -377,5 +381,125 @@ describe("serializeNode with enrich option", () => {
 
     expect(result.children).toHaveLength(1);
     expect(result.children?.[0].id).toBe("1:2");
+  });
+});
+
+describe("serializeNode paint defaults", () => {
+  it("leaves opacity out of an opaque solid paint", () => {
+    const node = createMockSceneNode({
+      type: "RECTANGLE",
+      fills: [
+        { type: "SOLID", visible: true, color: { r: 1, g: 0, b: 0 }, opacity: 1 },
+      ],
+    });
+
+    const result = serializeNode(node as any);
+
+    expect(result.styles?.fills).toEqual([{ type: "SOLID", color: "#ff0000" }]);
+  });
+
+  it("keeps a solid paint whose opacity is not the default", () => {
+    const node = createMockSceneNode({
+      type: "RECTANGLE",
+      fills: [
+        { type: "SOLID", visible: true, color: { r: 1, g: 0, b: 0 }, opacity: 0.4 },
+      ],
+    });
+
+    const result = serializeNode(node as any);
+
+    expect(result.styles?.fills).toEqual([
+      { type: "SOLID", color: "#ff0000", opacity: 0.4 },
+    ]);
+  });
+});
+
+describe("serializeNodeWithinBudget", () => {
+  const childrenNamed = (count: number, prefix = "1") =>
+    Array.from({ length: count }, (_, index) =>
+      createMockSceneNode({
+        id: `${prefix}:${index + 2}`,
+        name: `Child number ${index} with a reasonably long name`,
+      })
+    );
+
+  it("returns a tree that fits untouched", () => {
+    const node = createMockSceneNode({ children: childrenNamed(3) });
+
+    const result = serializeNodeWithinBudget(node as any, MAX_NODE_RESULT_CHARS);
+
+    expect(result.truncated).toBeUndefined();
+    expect(result.note).toBeUndefined();
+    expect(result.children).toHaveLength(3);
+  });
+
+  it("cuts child by child and stays inside the budget", () => {
+    const children = childrenNamed(60);
+    const node = createMockSceneNode({ children });
+    const budget = 4_000;
+
+    const result = serializeNodeWithinBudget(node as any, budget);
+
+    expect(result.truncated).toBe(true);
+    expect(result.note).toContain(String(budget));
+    expect(JSON.stringify(result).length).toBeLessThanOrEqual(budget);
+    // Some children made it, but not all of them.
+    expect(result.children?.length ?? 0).toBeGreaterThan(0);
+    expect(result.children?.length ?? 0).toBeLessThan(children.length);
+    expect(result.childCount).toBe(children.length);
+  });
+
+  it("walks the whole tree when the budget is generous enough to hold it", () => {
+    const node = createMockSceneNode({
+      children: [
+        createMockSceneNode({
+          id: "1:2",
+          children: [createMockSceneNode({ id: "1:3" })],
+        }),
+      ],
+    });
+
+    const result = serializeNodeWithinBudget(node as any, 100 * 1024);
+
+    expect(result.truncated).toBeUndefined();
+    expect(result.children?.[0].children?.[0].id).toBe("1:3");
+  });
+
+  it("reports childCount instead of children once the depth limit is reached", () => {
+    const node = createMockSceneNode({
+      children: [
+        createMockSceneNode({
+          id: "1:2",
+          children: [createMockSceneNode({ id: "1:3" })],
+        }),
+      ],
+    });
+
+    const result = serializeNodeWithinBudget(node as any, 100 * 1024, { depth: 1 });
+
+    expect(result.children?.[0].childCount).toBe(1);
+    expect(result.children?.[0].children).toBeUndefined();
+  });
+
+  it("honours includeHidden while cutting", () => {
+    const visible = childrenNamed(40, "2");
+    const hidden = childrenNamed(40, "3").map((child) => ({
+      ...child,
+      visible: false,
+    }));
+    const node = createMockSceneNode({ children: [...visible, ...hidden] });
+
+    const without = serializeNodeWithinBudget(node as any, 4_000);
+    const withHidden = serializeNodeWithinBudget(node as any, 4_000, {
+      includeHidden: true,
+    });
+
+    // The hidden half is neither carried nor counted.
+    expect(without.truncated).toBe(true);
+    expect(JSON.stringify(without)).not.toMatch(/"3:\d+"/);
+    expect(without.childCount).toBe(visible.length);
+    // Asked for hidden nodes, the same budget has to cover both halves.
+    expect(withHidden.childCount).toBe(visible.length + hidden.length);
+    expect(withHidden.children?.length ?? 0).toBeGreaterThan(0);
   });
 });

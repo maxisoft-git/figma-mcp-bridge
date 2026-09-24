@@ -72,6 +72,13 @@ Fetch a single node (and optionally its children) by ID.
 
 **Returns:** a single node. Same shape as nodes in `get_document` output.
 
+A read is bounded: a subtree larger than 50 000 characters comes back cut where
+the budget ran out, marked `truncated: true` with a `note`. A node the walk
+stopped at carries `childCount` beside the `children` it did manage to include —
+that count says how many more there are, and reading that node again (or
+`get_design_context` with `depth`) fetches them. `depth` is honoured, and once it
+is reached the count stands in for the children.
+
 **Example call:**
 
 ```json
@@ -152,17 +159,21 @@ Find every node bound to a given variable.
 
 ### `get_screenshot`
 
-Export a node as PNG, SVG, JPG, or PDF, returned as a base64 string.
+Export a node as PNG, SVG, JPG, PDF, or WEBP, returned as a base64 string.
 
 **Input:**
 
 | Field | Type | Default |
 |---|---|---|
 | `nodeIds` | string[] | current selection if empty |
-| `format` | `"PNG"` \| `"SVG"` \| `"JPG"` \| `"PDF"` | `"PNG"` |
+| `format` | `"PNG"` \| `"SVG"` \| `"JPG"` \| `"PDF"` \| `"WEBP"` | `"PNG"` |
 | `scale` | number | `2` (ignored for SVG) |
 
 **Returns:** `[{ nodeId, nodeName, format, base64, width, height }]`
+
+Figma cannot export webp, so a `WEBP` request is exported as PNG and re-encoded
+by the server with `cwebp` (libwebp), which must be on `PATH` — the error names
+the fix when it is missing.
 
 ### `save_screenshots`
 
@@ -178,11 +189,15 @@ Same as `get_screenshot`, but writes the result to disk. **Batch tool** — take
 
 `outputPath` is relative to the MCP server's current working directory. The server refuses to write outside that directory (path-traversal protection).
 
+The extension of `outputPath` selects the format when `format` is omitted
+(`.png`, `.svg`, `.jpg`/`.jpeg`, `.pdf`, `.webp`), and a `format` that contradicts
+the extension is refused instead of writing the wrong bytes into the file.
+
 ### `get_image`
 
-Like `get_screenshot` but for image-bearing nodes. Returns `{ mime, base64, source, scaleMode, bytes, … }`.
+Like `get_screenshot` but for image-bearing nodes. Returns `{ nodeId, nodeName, format, base64, scale, width, height }`; with `outputPath`, writes the file and returns metadata instead of base64.
 
-**Input:** `{ nodeId, backgroundOnly? }` (one node per call).
+**Input:** `{ nodeId, format?, scale?, backgroundOnly?, outputPath? }` (one node per call). As with `save_screenshots`, a bare `outputPath` extension picks the format, and `WEBP` is re-encoded server-side.
 
 ### `save_node_json`
 

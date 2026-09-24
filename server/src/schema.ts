@@ -5,7 +5,7 @@ import { extensionSchemas, extensionRpcToArgs } from "./extensions/index.js";
 export const figmaNodeId = z
   .string()
   .regex(/^\d+:\d+(;\d+:\d+)*$/, "Node ID must use colon format, e.g. '4029:12345', or composite format for instances, e.g. '4029:12345;4029:67890'");
-const exportFormat = z.enum(["PNG", "SVG", "JPG", "PDF"]);
+const exportFormat = z.enum(["PNG", "SVG", "JPG", "PDF", "WEBP"]);
 const hexColor = z
   .string()
   .regex(/^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/, "Color must be a hex value like '#FFAA00'");
@@ -330,6 +330,14 @@ export const toolInputSchemas = {
   get_node: z.object({
     nodeId: figmaNodeId.describe("The node ID to fetch"),
     fileKey: fileKeyField,
+    depth: z
+      .number()
+      .int()
+      .min(0)
+      .optional()
+      .describe(
+        "How many levels of children to include (default: unlimited). At the limit a node reports childCount instead of children.",
+      ),
     includeHidden: z.boolean().optional().describe("Include hidden children in the tree (default false)"),
     includeImageData: z.boolean().optional().describe("Include actual image bytes for nodes with image fills (default false)"),
     enrich: z.boolean().optional().describe("Resolve style references and bound variables to human-readable names + values for accurate code generation (default false)"),
@@ -374,7 +382,9 @@ export const toolInputSchemas = {
       ),
     format: exportFormat
       .optional()
-      .describe("Export format: PNG (default) or SVG or JPG or PDF"),
+      .describe(
+        "Export format: PNG (default), SVG, JPG, PDF, or WEBP. WEBP is encoded server-side from a PNG export (needs the `cwebp` binary on PATH) since Figma cannot export webp directly.",
+      ),
     scale: z
       .number()
       .optional()
@@ -500,7 +510,9 @@ export const toolInputSchemas = {
             ),
           format: exportFormat
             .optional()
-            .describe("Per-item export format override: PNG, SVG, JPG, or PDF"),
+            .describe(
+              "Per-item export format override: PNG, SVG, JPG, PDF, or WEBP",
+            ),
           scale: z
             .number()
             .optional()
@@ -511,7 +523,9 @@ export const toolInputSchemas = {
       .describe("List of screenshot save operations to execute in batch"),
     format: exportFormat
       .optional()
-      .describe("Default export format: PNG (default) or SVG or JPG or PDF"),
+      .describe(
+        "Default export format: PNG (default), SVG, JPG, PDF, or WEBP. WEBP is encoded server-side from a PNG export (needs the `cwebp` binary on PATH).",
+      ),
     scale: z
       .number()
       .optional()
@@ -612,7 +626,9 @@ export const toolInputSchemas = {
     nodeId: figmaNodeId.describe("The node ID to export as image (colon-separated format)"),
     format: exportFormat
       .optional()
-      .describe("Export format: PNG (default) or SVG or JPG"),
+      .describe(
+        "Export format: PNG (default), SVG, JPG, PDF, or WEBP. WEBP is encoded server-side from a PNG export (needs the `cwebp` binary on PATH). A bare outputPath's extension is honoured when format is omitted.",
+      ),
     scale: z
       .number()
       .optional()

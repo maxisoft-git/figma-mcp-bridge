@@ -59,6 +59,21 @@ All `/ws` requests are validated:
 | `RATE_LIMIT_RPC_DISABLE` | unset | If set to `1`, disables the per-IP rate limiter on `/rpc`. Useful for benchmarks; never set in production. |
 | `DRAIN_TIMEOUT_MS` | `10000` | On `SIGTERM`/`SIGINT`, how long to wait for in-flight RPC requests to finish before forcing exit. |
 
+## Export formats
+
+The export tools accept `PNG`, `SVG`, `JPG`, `PDF` and `WEBP` (`server/src/export-format.ts`).
+
+- Figma's `exportAsync` cannot emit webp, so a `WEBP` request is exported as PNG
+  and re-encoded by the server with `cwebp` (libwebp), which must be on `PATH`
+  (`server/src/webp.ts`). The error names the install command when it is missing.
+- `save_screenshots` and `get_image` infer the format from `outputPath`'s
+  extension when `format` is omitted (`.png`, `.svg`, `.jpg`/`.jpeg`, `.pdf`,
+  `.webp`). A `format` that contradicts the extension fails the call rather than
+  writing mismatched bytes into the file.
+- `get_node` reads are bounded to 50 000 characters; a larger subtree is cut
+  child by child on the plugin side (`serializeNodeWithinBudget`) and reports
+  `truncated`, a `note`, and `childCount` on the nodes the walk stopped at.
+
 ## Multi-file support
 
 The leader can hold many concurrent WebSocket connections, each one a different Figma file:

@@ -21,13 +21,20 @@ import type { BridgeResponse } from "./types.js";
 import { buildSprite, type IconInput } from "./sprite.js";
 import { fetchImageBytes, MAX_IMAGE_BYTES } from "./ssrf.js";
 import { registerExtensionTools } from "./extensions/index.js";
+import {
+  inferFormatFromPath,
+  resolveExportFormat,
+  wireFormatFor,
+  type ExportFormat,
+} from "./export-format.js";
+import { encodeWebp } from "./webp.js";
 
 type ToolResult = {
   content: Array<{ type: "text"; text: string }>;
   isError?: boolean;
 };
 
-export type ExportFormat = "PNG" | "SVG" | "JPG" | "PDF";
+export type { ExportFormat };
 
 /** Largest html-figma layer-tree JSON the server will read from disk. */
 const MAX_LAYERS_JSON_BYTES = 16 * 1024 * 1024;
@@ -128,10 +135,11 @@ export function registerTools(server: McpServer, node: Node, port: number): void
 
   server.tool(
     "get_node",
-    "Get a specific Figma node by ID. Must use colon format, e.g. '4029:12345', never use hyphens. When multiple files are connected, specify fileKey.",
+    "Get a specific Figma node by ID. Must use colon format, e.g. '4029:12345', never use hyphens. Returns the whole subtree unless `depth` cuts it, and a subtree too large for one result is cut at the budget with `truncated: true` and `childCount` on the nodes it stopped at. When multiple files are connected, specify fileKey.",
     toolInputSchemas.get_node.shape,
-    async ({ nodeId, fileKey, includeHidden, includeImageData }): Promise<ToolResult> => {
+    async ({ nodeId, fileKey, depth, includeHidden, includeImageData }): Promise<ToolResult> => {
       const params: Record<string, unknown> = {};
+      if (depth !== undefined) params.depth = depth;
       if (includeHidden) params.includeHidden = true;
       if (includeImageData) params.includeImageData = true;
       return renderResponse(() =>
@@ -226,65 +234,98 @@ export function registerTools(server: McpServer, node: Node, port: number): void
 
   server.tool(
     "get_screenshot",
-    "Export a screenshot of the selected nodes or specific nodes by ID. Returns base64-encoded image data. When multiple files are connected, specify fileKey.",
+    "Export a screenshot of the selected nodes or specific nodes by ID as PNG/SVG/JPG/PDF/WEBP. Returns base64-encoded image data; WEBP is encoded server-side from a PNG export and needs `cwebp` on PATH. When multiple files are connected, specify fileKey.",
     toolInputSchemas.get_screenshot.shape,
     async ({ nodeIds, format, scale, fileKey }): Promise<ToolResult> => {
       const params: Record<string, unknown> = {};
-      if (format) params.format = format;
+      if (format) params.format = wireFormatFor(format);
       if (scale !== undefined && scale > 0) params.scale = scale;
-      return renderResponse(() =>
-        node.sendWithParams("get_screenshot", nodeIds, params, fileKey)
-      );
+      return renderResponse(async () => {
+        const resp = await node.sendWithParams(
+          "get_screenshot",
+          nodeIds,
+          params,
+          fileKey
+        );
+        if (resp.error || format !== "WEBP") return resp;
+        // The plugin exported PNG for this request; hand back webp instead.
+        return { ...resp, data: await reencodeExportsAsWebp(resp.data) };
+      });
     }
   );
 
   server.tool(
     "get_image",
-    "Export a specific node as an image. Set backgroundOnly to export only the background fill of a frame without its children. If outputPath is provided, saves the image to disk instead of returning base64. When multiple files are connected, specify fileKey.",
+    "Export a specific node as an image (PNG/SVG/JPG/PDF/WEBP). Set backgroundOnly to export only the background fill of a frame without its children. If outputPath is provided, saves the image to disk instead of returning base64, and its extension picks the format (WEBP is encoded server-side from a PNG export, needs `cwebp` on PATH). When multiple files are connected, specify fileKey.",
     toolInputSchemas.get_image.shape,
     async ({ nodeId, format, scale, backgroundOnly, outputPath, fileKey }): Promise<ToolResult> => {
-      const params: Record<string, unknown> = {};
-      if (format) params.format = format;
-      if (scale !== undefined && scale > 0) params.scale = scale;
-      if (backgroundOnly) params.backgroundOnly = true;
+      try {
+        const targetPath =
+          outputPath !== undefined
+            ? resolveAndValidateOutputPath(outputPath, process.cwd())
+            : undefined;
 
-      const resp = await node.sendWithParams("get_image", [nodeId], params, fileKey);
-      if (resp.error) {
-        return { content: [{ type: "text", text: resp.error }], isError: true };
-      }
+        // An explicit format wins, but a bare outputPath should still export
+        // what its extension says — otherwise "shot.webp" silently receives
+        // PNG bytes.
+        const resolvedFormat = resolveExportFormat(
+          format,
+          targetPath ? inferFormatFromPath(targetPath) : null
+        );
 
-      const data = resp.data as { base64?: string; nodeId: string; nodeName: string; format: string; scale: number; width: number; height: number };
+        const params: Record<string, unknown> = {
+          format: wireFormatFor(resolvedFormat),
+        };
+        if (scale !== undefined && scale > 0) params.scale = scale;
+        if (backgroundOnly) params.backgroundOnly = true;
 
-      if (outputPath && data.base64) {
-        try {
-          const resolvedPath = resolveAndValidateOutputPath(outputPath, process.cwd());
-          const bytesWritten = await writeBase64ToFile(data.base64, resolvedPath);
+        const resp = await node.sendWithParams("get_image", [nodeId], params, fileKey);
+        if (resp.error) {
+          return { content: [{ type: "text", text: resp.error }], isError: true };
+        }
+
+        const data = resp.data as { base64?: string; nodeId: string; nodeName: string; format: string; scale: number; width: number; height: number };
+
+        if (targetPath && data.base64) {
+          const bytesWritten = await writeExportToFile(
+            data.base64,
+            targetPath,
+            resolvedFormat
+          );
           return {
             content: [{
               type: "text",
               text: JSON.stringify({
                 nodeId: data.nodeId,
                 nodeName: data.nodeName,
-                format: data.format,
+                format: resolvedFormat,
                 scale: data.scale,
                 width: data.width,
                 height: data.height,
-                outputPath: resolvedPath,
+                outputPath: targetPath,
                 bytesWritten,
               }),
             }],
           };
-        } catch (err) {
-          return {
-            content: [{ type: "text", text: err instanceof Error ? err.message : String(err) }],
-            isError: true,
-          };
         }
-      }
 
-      return {
-        content: [{ type: "text", text: JSON.stringify(data) }],
-      };
+        const inlineBase64 =
+          resolvedFormat === "WEBP" && data.base64
+            ? (await encodeWebp(Buffer.from(data.base64, "base64"))).toString("base64")
+            : data.base64;
+
+        return {
+          content: [{
+            type: "text",
+            text: JSON.stringify({ ...data, format: resolvedFormat, base64: inlineBase64 }),
+          }],
+        };
+      } catch (err) {
+        return {
+          content: [{ type: "text", text: err instanceof Error ? err.message : String(err) }],
+          isError: true,
+        };
+      }
     }
   );
 
@@ -1430,33 +1471,32 @@ async function loadLayersJson(
   return root as Record<string, unknown>;
 }
 
-function inferFormatFromPath(outputPath: string): ExportFormat | null {
-  const ext = path.extname(outputPath).toLowerCase();
-  switch (ext) {
-    case ".png":
-      return "PNG";
-    case ".svg":
-      return "SVG";
-    case ".jpg":
-    case ".jpeg":
-      return "JPG";
-    case ".pdf":
-      return "PDF";
-    default:
-      return null;
+/**
+ * Re-encodes the PNG exports in a screenshot payload as WEBP.
+ *
+ * Only WEBP requests take this path, and the plugin answered those with PNG
+ * bytes, so each entry is re-encoded and relabelled.
+ * @param data - Screenshot payload from the plugin.
+ * @returns The same payload with WEBP exports.
+ */
+async function reencodeExportsAsWebp(data: unknown): Promise<unknown> {
+  if (!data || typeof data !== "object") {
+    throw new Error("Invalid screenshot response from plugin");
   }
-}
-
-function resolveExportFormat(
-  format: ExportFormat | undefined,
-  inferredFormat: ExportFormat | null
-): ExportFormat {
-  if (format && inferredFormat && format !== inferredFormat) {
-    throw new Error(
-      `format ${format} conflicts with outputPath extension (${inferredFormat})`
-    );
+  const payload = data as { exports?: unknown };
+  if (!Array.isArray(payload.exports)) {
+    throw new Error("Invalid screenshot response from plugin");
   }
-  return format ?? inferredFormat ?? "PNG";
+  const exports = await Promise.all(
+    payload.exports.map(async (entry) => {
+      if (!entry || typeof entry !== "object") return entry;
+      const item = entry as { base64?: unknown };
+      if (typeof item.base64 !== "string") return entry;
+      const webp = await encodeWebp(Buffer.from(item.base64, "base64"));
+      return { ...entry, format: "WEBP", base64: webp.toString("base64") };
+    })
+  );
+  return { ...payload, exports };
 }
 
 function getSingleScreenshotExport(data: unknown): ScreenshotExport {
@@ -1508,7 +1548,9 @@ async function saveScreenshotItemToFile(
     );
     const resolvedScale = resolveScale(item.scale, defaultScale);
 
-    const params: Record<string, unknown> = { format: resolvedFormat };
+    const params: Record<string, unknown> = {
+      format: wireFormatFor(resolvedFormat),
+    };
     if (resolvedScale !== undefined) {
       params.scale = resolvedScale;
     }
@@ -1523,9 +1565,10 @@ async function saveScreenshotItemToFile(
     }
 
     const screenshotExport = getSingleScreenshotExport(resp.data);
-    const bytesWritten = await writeBase64ToFile(
+    const bytesWritten = await writeExportToFile(
       screenshotExport.base64,
-      resolvedOutputPath
+      resolvedOutputPath,
+      resolvedFormat
     );
 
     return {
@@ -1565,6 +1608,37 @@ async function writeBase64ToFile(
     throw err;
   }
   return bytes.length;
+}
+
+/**
+ * Writes an export to disk, re-encoding to WEBP when that format was asked for.
+ *
+ * The bytes the plugin returned are PNG for a WEBP request, so the caller's
+ * format — not the payload's — decides both the encoding and the extension.
+ * @param base64 - Bytes returned by the plugin.
+ * @param outputPath - Destination file path.
+ * @param format - Format the caller asked for.
+ * @returns Number of bytes written.
+ */
+async function writeExportToFile(
+  base64: string,
+  outputPath: string,
+  format: ExportFormat
+): Promise<number> {
+  if (format !== "WEBP") {
+    return writeBase64ToFile(base64, outputPath);
+  }
+  const webp = await encodeWebp(Buffer.from(base64, "base64"));
+  await mkdir(path.dirname(outputPath), { recursive: true });
+  try {
+    await writeFile(outputPath, webp, { flag: "wx" });
+  } catch (err) {
+    if (isNodeError(err) && err.code === "EEXIST") {
+      throw new Error(`File already exists at outputPath: ${outputPath}`);
+    }
+    throw err;
+  }
+  return webp.length;
 }
 
 function resolveScale(

@@ -107,6 +107,8 @@ type SerializedNode = {
   boundVariables?: SerializedBoundVariables;
   children?: SerializedNode[];
   childCount?: number;
+  truncated?: boolean;
+  note?: string;
 };
 
 type SerializedStyleReferences = {
@@ -187,7 +189,9 @@ const serializePaints = (
             {
               type: "SOLID",
               color: toHex(paint.color),
-              opacity: paint.opacity,
+              // Left out at the default, like the style fields around it: a
+              // paint is opaque unless it says otherwise.
+              ...(paint.opacity === 1 ? {} : { opacity: paint.opacity }),
             },
           ];
         case "GRADIENT_LINEAR":
@@ -436,8 +440,16 @@ export type SerializeOptions = {
   includeImageData?: boolean;
   enrich?: boolean;
 };
-
-export const serializeNode = (
+/**
+ * Serializes one node on its own, without its children.
+ *
+ * Shared by the full walk and the budgeted one, so a node is described the
+ * same way whichever path reads it.
+ * @param node - The node to serialize.
+ * @param options - Serialization options (enrichment applies here).
+ * @returns The node, with no `children`.
+ */
+const serializeSelf = (
   node: SceneNode,
   options?: SerializeOptions
 ): SerializedNode => {
@@ -459,31 +471,127 @@ export const serializeNode = (
     return serializeText(node, base);
   }
 
-  if ("children" in node) {
-    const children = options?.includeHidden
-      ? node.children
-      : node.children.filter((child) => child.visible !== false);
-    const effectiveDepth = options?.depth ?? Infinity;
-    const nextDepth = (options?.currentDepth ?? 0) + 1;
-    if (nextDepth > effectiveDepth) {
-      return {
-        ...base,
-        children: undefined,
-        childCount: children.length,
-      };
-    }
-    return {
-      ...base,
-      children: children.map((child) =>
-        serializeNode(child, {
-          ...options,
-          currentDepth: nextDepth,
-        })
-      ),
-    };
-  }
-
   return base;
+};
+
+/**
+ * The children of a node that a read reports.
+ * @param node - The node.
+ * @param options - Serialization options; hidden children are skipped unless
+ *   the caller asked for them.
+ * @returns Its reported children, empty when it takes none.
+ */
+const visibleChildrenOf = (
+  node: SceneNode,
+  options?: SerializeOptions
+): readonly SceneNode[] => {
+  if (!("children" in node)) return [];
+  return options?.includeHidden
+    ? node.children
+    : node.children.filter((child) => child.visible !== false);
+};
+
+
+
+export const serializeNode = (
+  node: SceneNode,
+  options?: SerializeOptions
+): SerializedNode => {
+  const base = serializeSelf(node, options);
+  const children = visibleChildrenOf(node, options);
+  // An empty list says only that the node takes children, which its type
+  // already says. Left out, like the style fields sitting at their default.
+  if (children.length === 0) return base;
+
+  const nextDepth = (options?.currentDepth ?? 0) + 1;
+  // At the limit the count stands in for the children, the same way a subtree
+  // cut by the budget reports what it did not carry.
+  if (nextDepth > (options?.depth ?? Infinity)) {
+    return { ...base, childCount: children.length };
+  }
+  return {
+    ...base,
+    children: children.map((child) =>
+      serializeNode(child, {
+        ...options,
+        currentDepth: nextDepth,
+      })
+    ),
+  };
+};
+
+/** The most characters one node read hands back before it starts cutting. */
+export const MAX_NODE_RESULT_CHARS = 50_000;
+
+/**
+ * Serializes a node, cutting the subtree short when it will not fit.
+ *
+ * A node read is unbounded by nature: the result is the whole subtree, and a
+ * frame holding a few hundred instances runs past what one tool call should
+ * hand an agent. A tree that fits comes back untouched, which is nearly every
+ * call. One that does not is filled in child by child until the budget runs
+ * out, rather than by dropping whole levels — a frame of 200 instances would
+ * otherwise have to choose between all of them and none, and none is what it
+ * would get.
+ *
+ * A node the walk stopped at reports `childCount`, the children it really has,
+ * beside the `children` it managed to carry. The two together say what is
+ * missing, and the note says which call reads it.
+ * @param node - The node to serialize.
+ * @param budget - The most characters to return.
+ * @param options - Serialization options (hidden children, depth, enrichment).
+ * @returns The subtree, marked `truncated` when it was cut.
+ */
+export const serializeNodeWithinBudget = (
+  node: SceneNode,
+  budget: number = MAX_NODE_RESULT_CHARS,
+  options?: SerializeOptions
+): SerializedNode => {
+  const full = serializeNode(node, options);
+  if (JSON.stringify(full).length <= budget) return full;
+
+  const note = `The subtree is larger than ${budget} characters, so it was cut where the budget ran out. A node whose childCount is higher than the children it carries has that many more: call get_node on it, or get_design_context with depth, to read them.`;
+
+  const build = (allowance: number): SerializedNode => {
+    let spent = 0;
+    const walk = (current: SceneNode, currentDepth: number): SerializedNode => {
+      const self = serializeSelf(current, { ...options, currentDepth });
+      spent += JSON.stringify(self).length;
+
+      const children = visibleChildrenOf(current, options);
+      if (children.length === 0) return self;
+      if (currentDepth + 1 > (options?.depth ?? Infinity)) {
+        return { ...self, childCount: children.length };
+      }
+
+      const kept: SerializedNode[] = [];
+      for (const child of children) {
+        if (spent >= allowance) break;
+        kept.push(walk(child, currentDepth + 1));
+      }
+      if (kept.length === 0) return { ...self, childCount: children.length };
+      if (kept.length < children.length) {
+        return { ...self, children: kept, childCount: children.length };
+      }
+      return { ...self, children: kept };
+    };
+    return { ...walk(node, options?.currentDepth ?? 0), truncated: true, note };
+  };
+
+  // The walk measures each node on its own, so the commas, the `children`
+  // brackets holding them, and this note land on top of what it counted and
+  // carry the result past the budget. Rather than model that overhead, take
+  // the overshoot off the allowance and walk again: it converges in a step or
+  // two, and a walk is cheap next to the round trip that asked for it.
+  let allowance = budget;
+  let result = build(allowance);
+  for (let attempt = 0; attempt < 8; attempt++) {
+    const over = JSON.stringify(result).length - budget;
+    if (over <= 0) break;
+    allowance = Math.max(0, allowance - over - 64);
+    result = build(allowance);
+  }
+  return result;
 };
 
 const getAbsoluteBounds = (node: SceneNode): SerializedBounds | undefined => {

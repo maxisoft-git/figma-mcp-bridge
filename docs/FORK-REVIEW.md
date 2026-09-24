@@ -61,8 +61,19 @@ Most forks are silent snapshots. Ranked by unique work:
   extension areas — sections, variables write, typography, components (25 tools).
 - **P1b — ported**: `import_html_layers` (upstream #47; vendored html-figma
   renderer under `plugin/src/html-figma`, MIT — see its `NOTICE.md`).
-- **Still open**: `get_node` budget + serializer defaults, Motion API,
-  WEBP/format inference, persistent cache.
+- **P2 — ported**: realSeyed's read budget for `get_node`
+  (`serializeNodeWithinBudget`: a subtree over 50 000 characters is cut child by
+  child, marked `truncated` with a `note`, `childCount` on the nodes the walk
+  stopped at, and opaque solid paints drop their default `opacity`); `get_node`
+  now honours the `depth` it always documented. WEBP export and
+  extension-derived formats (`server/src/export-format.ts`, `server/src/webp.ts`,
+  both tested): `WEBP` travels as a PNG export and is re-encoded through `cwebp`,
+  a bare `outputPath` extension picks the format, and a `format` that contradicts
+  the extension is refused instead of writing the wrong bytes.
+- **Still open**: Motion API (upstream `93d2b56`), persistent read cache
+  (chihuy105), the rest of vladmdgolam's papercuts (hyphen node IDs, inline regex
+  flags, stale `fileKey` fallback, `FIGMA_BRIDGE_OUTPUT_ROOT`), `get_node` field
+  projection (`fields`).
 - **P3 — open**: onboarding `setup.sh`, agent CLI, comments via REST,
   cross-machine leader.
 
