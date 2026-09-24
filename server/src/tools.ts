@@ -794,12 +794,26 @@ export function registerTools(server: McpServer, node: Node, port: number): void
 
   server.tool(
     "get_dev_image",
-    "Dev Mode Mirror: extract the image from a node. Tries (1) direct imageHash, (2) imageHash on a direct child, (3) node.exportAsync(PNG) fallback. Returns { nodeId, nodeName, nodeType, mime, source, scaleMode, base64, bytes }.",
+    "Dev Mode Mirror: extract the image from a node. Tries (1) direct imageHash, (2) imageHash on a direct child, (3) node.exportAsync(PNG) fallback. Returns the bitmap as MCP image content (never as base64 text) plus JSON metadata { nodeId, nodeName, nodeType, mime, source, scaleMode, bytes }.",
     toolInputSchemas.get_dev_image.shape,
     async ({ fileKey, nodeIds }): Promise<ToolResult> => {
-      return renderResponse(() =>
-        node.sendWithParams("get_dev_image", nodeIds, undefined, fileKey)
-      );
+      try {
+        const resp = await node.sendWithParams(
+          "get_dev_image",
+          nodeIds,
+          undefined,
+          fileKey
+        );
+        if (resp.error) {
+          return { content: [{ type: "text", text: resp.error }], isError: true };
+        }
+        return { content: devImageContent(resp.data) };
+      } catch (err) {
+        return {
+          content: [{ type: "text", text: err instanceof Error ? err.message : String(err) }],
+          isError: true,
+        };
+      }
     }
   );
 
@@ -1591,6 +1605,33 @@ export function screenshotContent(data: unknown): ToolResultContent[] {
     });
   }
 
+  content.push({ type: "text", text: JSON.stringify(meta) });
+  return content;
+}
+
+/**
+ * Converts a `get_dev_image` payload into MCP content parts: the bitmap as
+ * `image` content (base64 stays out of the context window), everything else
+ * as a JSON metadata line.
+ * @param data - Payload from the plugin.
+ * @returns Image part, when the payload carries one, plus metadata.
+ */
+export function devImageContent(data: unknown): ToolResultContent[] {
+  if (!data || typeof data !== "object") {
+    throw new Error("Invalid dev image response from plugin");
+  }
+  const payload = data as { base64?: unknown; mime?: unknown };
+  const meta = { ...(data as Record<string, unknown>) };
+  delete meta.base64;
+
+  const content: ToolResultContent[] = [];
+  if (typeof payload.base64 === "string" && payload.base64.length > 0) {
+    const mime = typeof payload.mime === "string" && payload.mime ? payload.mime : "image/png";
+    if (!mime.startsWith("image/")) {
+      throw new Error(`Unsupported dev image mime: ${mime}`);
+    }
+    content.push({ type: "image", data: payload.base64, mimeType: mime });
+  }
   content.push({ type: "text", text: JSON.stringify(meta) });
   return content;
 }

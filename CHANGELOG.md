@@ -46,6 +46,10 @@ source; PDF as metadata only (it cannot be rendered inline — use
 `get_image` + `outputPath`, or `save_screenshots`, to get PDF bytes on
 disk). `get_image` with `outputPath` is unchanged.
 
+`get_dev_image` (Dev Mode Mirror) follows the same rule: the extracted
+bitmap comes back as MCP `image` content with its real mime, metadata
+without `base64`; a non-image mime is rejected instead of being inlined.
+
 ### New: `export_icon_sprite` tool
 
 Find SVG icons across the file, deduplicate them, and write a single `<symbol>`-based sprite to disk.

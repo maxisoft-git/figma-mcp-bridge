@@ -3,7 +3,12 @@ import { readFileSync } from "node:fs";
 import { readFile, rm } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { executeSaveScreenshots, screenshotContent, type ScreenshotSender } from "./tools.js";
+import {
+  devImageContent,
+  executeSaveScreenshots,
+  screenshotContent,
+  type ScreenshotSender,
+} from "./tools.js";
 
 /**
  * The repo's own logo, used as real PNG bytes so the export path is exercised
@@ -179,5 +184,34 @@ describe("screenshotContent", () => {
     expect(content).toHaveLength(1);
     const meta = metaOf(content);
     expect((meta[0] as { note: string }).note).toMatch(/outputPath/);
+  });
+});
+
+describe("devImageContent", () => {
+  it("returns the bitmap as image content and metadata without base64", () => {
+    const base64 = Buffer.from("jpeg").toString("base64");
+    const content = devImageContent({
+      nodeId: "1:2",
+      nodeName: "Photo",
+      nodeType: "RECTANGLE",
+      mime: "image/jpeg",
+      source: "node",
+      scaleMode: "FILL",
+      bytes: 4,
+      base64,
+    });
+
+    expect(content[0]).toEqual({ type: "image", data: base64, mimeType: "image/jpeg" });
+    const last = content[content.length - 1];
+    if (last.type !== "text") throw new Error("expected a trailing text metadata part");
+    const meta = JSON.parse(last.text);
+    expect(meta).not.toHaveProperty("base64");
+    expect(meta).toMatchObject({ nodeId: "1:2", source: "node" });
+  });
+
+  it("rejects a non-image mime instead of dumping base64 into the context", () => {
+    expect(() =>
+      devImageContent({ nodeId: "1:2", mime: "application/pdf", base64: "AAAA" })
+    ).toThrow(/Unsupported dev image mime/);
   });
 });
