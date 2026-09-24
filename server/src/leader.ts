@@ -72,9 +72,14 @@ export class Leader {
         );
       });
 
-      server.listen(this.port, () => {
+      // Bind to loopback by default: the bridge has no authentication, so
+      // exposing it on every interface lets anyone on the LAN drive the
+      // user's Figma session. Set FIGMA_BRIDGE_HOST=0.0.0.0 only when the
+      // cross-machine leader setup is explicitly wanted.
+      const host = process.env.FIGMA_BRIDGE_HOST || "127.0.0.1";
+      server.listen(this.port, host, () => {
         this.server = server;
-        console.error(`Leader listening on :${this.port}`);
+        console.error(`Leader listening on ${host}:${this.port}`);
         resolve();
       });
     });

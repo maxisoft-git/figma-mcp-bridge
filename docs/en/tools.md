@@ -1,6 +1,6 @@
 # Tool reference
 
-75 tools, organised by what they do. Every tool:
+110 tools, organised by what they do. Every tool:
 
 - Has a unique name (e.g. `get_node`)
 - Takes a Zod-validated object as input
@@ -270,7 +270,7 @@ Every write tool takes `{ nodeId | nodeIds, …args }` and returns the previous 
 
 | Tool | Effect |
 |---|---|
-| `batch_mutation` | Apply many small mutations in a single call (faster than 75 separate tool calls; supports per-node param resolution via `tmp:` references) |
+| `batch_mutation` | Apply many small mutations in a single call (faster than 110 separate tool calls; supports per-node param resolution via `tmp:` references) |
 | `update_component_instances` | Push master changes to all instances of a component |
 | `bulk_rename` | Rename nodes by regex pattern, with optional scope (page / selection / sub-tree) |
 | `bulk_swap_text` | Replace text on multiple nodes at once |
@@ -382,6 +382,36 @@ The standalone script uses `dedupeMode: "none"` and writes to disk directly. Use
 ---
 
 ## Input shape (all tools)
+
+## Extension tools
+
+Beyond the core set above, the bridge ships an extension surface ported from
+the `realSeyed/figma-mcp-bridge` fork (MIT). These are grouped by area:
+
+| Tool | What it does |
+|---|---|
+| `get_layout_tree` | Absolute transforms and bounds for every node under a capture root (read-only geometry, separate from screenshots). |
+| `create_page` | Create a page, optionally name it and switch to it. Returns its ID for use as a `parentId`. |
+| `execute_code` | Run JavaScript in the plugin sandbox against the Figma Plugin API — an escape hatch for anything the other tools do not cover. Writes are real. |
+| `list_sections` / `get_section` | List sections (with page, parent section, child count) and read one (children, real content bounds, overflow). |
+| `create_section` | Create a section, empty at a size or wrapping existing nodes while keeping them in place. |
+| `fit_section` | Resize a section tight around its visible children. |
+| `move_to_section` / `move_out_of_section` | Move nodes into a section, or lift them one level out, keeping canvas position. |
+| `update_variable_collection` / `delete_variable_collection` | Rename or remove a variable collection. |
+| `create_variables` | Create up to 200 variables in one call, including aliases to variables of the same batch. |
+| `update_variables` | Rename variables and change value, scopes or description. |
+| `delete_variables` | Remove variables and report which other variables aliased them. |
+| `bind_variables` | Bind variables to node fields (fills, strokes, size, padding, text, …) or clear a binding. |
+| `list_fonts` | List available font families and styles. |
+| `update_text_style` / `delete_text_style` / `apply_text_style` | Edit, remove, or apply a local text style (optionally to a character range). |
+| `get_component` / `get_instance` | Read a component, component set, or instance in detail. |
+| `combine_as_variants` | Combine free components into a component set (variants). |
+| `swap_instance` / `detach_instance` | Swap an instance's main component, or detach it. |
+| `add_component_property` / `edit_component_property` / `delete_component_property` / `bind_component_property` | Manage component properties and their bindings. |
+
+The core tools keep their own implementation where a name is shared
+(`create_component`, `create_instance`, `set_instance_properties`,
+`list_components`, `create_text_style`, `create_variable_collection`).
 
 Every tool's input is validated against a Zod schema in `server/src/schema.ts`. Common fields:
 

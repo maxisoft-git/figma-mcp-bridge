@@ -7,7 +7,7 @@
 1. **MCP-сервер** (`@maxisoft/figma-mcp-bridge`, опубликован в npm)
    - Запускается там же, где AI-клиент
    - Реализует Model Context Protocol (stdio transport)
-   - Экспонирует 75 инструментов с Zod-валидированным JSON input и JSON output
+   - Экспонирует 110 инструментов с Zod-валидированным JSON input и JSON output
    - Владеет портом 1994 на localhost (HTTP + WebSocket)
 2. **Figma-плагин** (этот репо, директория `plugin/`)
    - Запускается *внутри песочницы Figma desktop* (или в iframe Figma web)
@@ -33,7 +33,7 @@ AI-агенты говорят на Model Context Protocol, который ож�
 | Concern | Где выполняется |
 |---|---|
 | AI agent ↔ MCP protocol | MCP-сервер (stdio) |
-| Регистрация инструментов (75 tools) | MCP-сервер |
+| Регистрация инструментов (110 tools) | MCP-сервер |
 | Zod-валидация | MCP-сервер |
 | Routing запросов (fileKey → connection) | MCP-сервер |
 | Per-IP rate limiting | MCP-сервер (только `/rpc`) |

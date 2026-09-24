@@ -6,6 +6,7 @@ import { Follower } from "./follower.js";
 import {
   createFrameInput,
   createImageInput,
+  createPageInput,
   createShapeShape,
   createTextShape,
   createShapeInput,
@@ -17,6 +18,8 @@ import {
 } from "./schema.js";
 import type { BridgeResponse } from "./types.js";
 import { buildSprite, type IconInput } from "./sprite.js";
+import { fetchImageBytes, MAX_IMAGE_BYTES } from "./ssrf.js";
+import { registerExtensionTools } from "./extensions/index.js";
 
 type ToolResult = {
   content: Array<{ type: "text"; text: string }>;
@@ -134,6 +137,27 @@ export function registerTools(server: McpServer, node: Node, port: number): void
   );
 
   server.tool(
+    "get_layout_tree",
+    "Read absolute node transforms and layout bounds for a capture root. Separate screenshot calls are non-atomic. When multiple files are connected, specify fileKey.",
+    toolInputSchemas.get_layout_tree.shape,
+    async ({ rootId, maxNodes, fileKey }): Promise<ToolResult> =>
+      renderResponse(() =>
+        node.sendWithParams("get_layout_tree", [rootId], { maxNodes }, fileKey)
+      )
+  );
+
+  server.tool(
+    "execute_code",
+    "Run JavaScript directly in the Figma plugin sandbox against the Plugin API — an escape hatch for anything the other tools do not cover. The code runs inside an async function, so it may `await` and `return` a JSON-safe value. Writes made here are real. When multiple files are connected, specify fileKey.",
+    toolInputSchemas.execute_code.shape,
+    async ({ code, fileKey }): Promise<ToolResult> => {
+      return renderResponse(() =>
+        node.sendWithParams("execute_code", undefined, { code }, fileKey)
+      );
+    }
+  );
+
+  server.tool(
     "get_styles",
     "Get all local styles in the document. When multiple files are connected, specify fileKey.",
     toolInputSchemas.get_styles.shape,
@@ -168,6 +192,21 @@ export function registerTools(server: McpServer, node: Node, port: number): void
       }
       return renderResponse(() =>
         node.sendWithParams("get_design_context", undefined, params, fileKey)
+      );
+    }
+  );
+
+  server.tool(
+    "get_implementation_context",
+    "Get a compact implementation-ready Figma context: precise auto-layout tree, typography, asset manifest, layout warnings, root CSS, and generated HTML. Use get_node when you need the complete raw Figma tree.",
+    toolInputSchemas.get_implementation_context.shape,
+    async ({ nodeId, maxDepth, includeHtml, includeCss, fileKey }): Promise<ToolResult> => {
+      const params: Record<string, unknown> = {};
+      if (maxDepth !== undefined) params.maxDepth = maxDepth;
+      if (includeHtml !== undefined) params.includeHtml = includeHtml;
+      if (includeCss !== undefined) params.includeCss = includeCss;
+      return renderResponse(() =>
+        node.sendWithParams("get_implementation_context", [nodeId], params, fileKey)
       );
     }
   );
@@ -321,6 +360,17 @@ export function registerTools(server: McpServer, node: Node, port: number): void
     async ({ nodeId, fileKey, ...properties }): Promise<ToolResult> => {
       return renderResponse(() =>
         node.sendWithParams("set_node_properties", [nodeId], properties, fileKey)
+      );
+    }
+  );
+
+  server.tool(
+    "create_page",
+    "Create a new page in the Figma document, optionally naming it and switching the editor to it. Returns the new page's ID, which can be passed as parentId to create_frame / create_text / create_shape / create_image to author content on that page. When multiple files are connected, specify fileKey.",
+    createPageInput.shape,
+    async ({ fileKey, ...params }): Promise<ToolResult> => {
+      return renderResponse(() =>
+        node.sendWithParams("create_page", undefined, params, fileKey)
       );
     }
   );
@@ -1193,6 +1243,8 @@ export function registerTools(server: McpServer, node: Node, port: number): void
       };
     }
   );
+
+  registerExtensionTools(server, node);
 }
 
 export async function executeSaveScreenshots(
@@ -1282,11 +1334,7 @@ async function loadImageSourceAsBase64(
   workspaceRoot: string
 ): Promise<string> {
   if (/^https?:\/\//i.test(source)) {
-    const resp = await fetch(source);
-    if (!resp.ok) {
-      throw new Error(`Failed to fetch image: ${resp.status} ${resp.statusText}`);
-    }
-    const bytes = Buffer.from(await resp.arrayBuffer());
+    const bytes = await fetchImageBytes(source);
     return bytes.toString("base64");
   }
 
@@ -1299,6 +1347,9 @@ async function loadImageSourceAsBase64(
     ? source
     : path.resolve(workspaceRoot, source);
   const bytes = await readFile(resolvedPath);
+  if (bytes.length > MAX_IMAGE_BYTES) {
+    throw new Error(`Image exceeds ${MAX_IMAGE_BYTES} bytes`);
+  }
   return bytes.toString("base64");
 }
 

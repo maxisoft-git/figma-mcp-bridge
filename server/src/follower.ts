@@ -1,23 +1,15 @@
-import http from "node:http";
 import type { BridgeResponse, ConnectedFile, RPCRequest, RPCResponse } from "./types.js";
 
 /**
  * Follower proxies MCP tool calls to the leader via HTTP /rpc.
  *
- * Uses a persistent http.Agent with `keepAlive: true` so the TCP
- * connection to the leader is reused across calls. Without it, every
- * fetch opens a new socket, paying ~10-50ms of TCP/TLS handshake.
+ * Node 18+ fetch has connection pooling by default, so we don't need a
+ * custom keep-alive Agent. Earlier versions passed a node:http.Agent via
+ * the undici `dispatcher` option, but that is incompatible with Node
+ * 24's built-in fetch (undici requires an undici.Agent there).
  */
 export class Follower {
-  private agent: http.Agent;
-
-  constructor(private leaderUrl: string) {
-    this.agent = new http.Agent({
-      keepAlive: true,
-      maxSockets: 4,
-      keepAliveMsecs: 30_000,
-    });
-  }
+  constructor(private leaderUrl: string) {}
 
   send(
     requestType: string,
@@ -40,8 +32,6 @@ export class Follower {
 
     const response = await fetch(`${this.leaderUrl}/rpc`, {
       method: "POST",
-      // @ts-expect-error — Node fetch accepts the dispatcher option.
-      dispatcher: this.agent,
       headers: {
         "Content-Type": "application/json",
         "Accept-Encoding": "gzip",
@@ -51,7 +41,10 @@ export class Follower {
     });
 
     if (!response.ok) {
-      throw new Error(`Leader returned status ${response.status}`);
+      // The leader answers validation failures with a 400 whose body names the
+      // offending field — surface it instead of a bare status code.
+      const body = (await response.json().catch(() => null)) as RPCResponse | null;
+      throw new Error(body?.error ?? `Leader returned status ${response.status}`);
     }
 
     // response.json() in undici auto-decompresses gzip / br / deflate.
@@ -71,8 +64,6 @@ export class Follower {
   async listConnectedFiles(): Promise<ConnectedFile[]> {
     const response = await fetch(`${this.leaderUrl}/rpc`, {
       method: "POST",
-      // @ts-expect-error — Node fetch accepts the dispatcher option.
-      dispatcher: this.agent,
       headers: {
         "Content-Type": "application/json",
         "Accept-Encoding": "gzip",
@@ -96,8 +87,6 @@ export class Follower {
   async ping(): Promise<boolean> {
     try {
       const response = await fetch(`${this.leaderUrl}/ping`, {
-        // @ts-expect-error — Node fetch accepts the dispatcher option.
-        dispatcher: this.agent,
         signal: AbortSignal.timeout(2_000),
       });
       return response.ok;

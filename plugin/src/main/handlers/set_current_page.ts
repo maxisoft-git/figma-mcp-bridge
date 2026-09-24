@@ -24,7 +24,8 @@ export async function handle(request: ServerRequest): Promise<PluginResponse> {
     );
   }
 
-  figma.currentPage = targetPage;
+  // Manifest uses dynamic-page access, so the sync setter throws.
+  await figma.setCurrentPageAsync(targetPage);
 
   return {
     type: request.type,

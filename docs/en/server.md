@@ -1,6 +1,6 @@
 # MCP Server
 
-The MCP server is the **bridge between your AI agent and the Figma plugin**. It implements the [Model Context Protocol](https://modelcontextprotocol.io/) (stdio transport) and exposes 75 Figma-aware tools. It also runs an HTTP + WebSocket server on `localhost:1994` that the Figma plugin connects to.
+The MCP server is the **bridge between your AI agent and the Figma plugin**. It implements the [Model Context Protocol](https://modelcontextprotocol.io/) (stdio transport) and exposes 110 Figma-aware tools. It also runs an HTTP + WebSocket server on `localhost:1994` that the Figma plugin connects to.
 
 ## Architecture
 

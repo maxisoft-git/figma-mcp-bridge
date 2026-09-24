@@ -7,7 +7,7 @@ The system has two completely separate Node.js processes that communicate only o
 1. **MCP server** (`@maxisoft/figma-mcp-bridge`, published to npm)
    - Runs wherever your AI client is
    - Implements the Model Context Protocol (stdio transport)
-   - Exposes 75 tools that take Zod-validated JSON input and return JSON output
+   - Exposes 110 tools that take Zod-validated JSON input and return JSON output
    - Owns port 1994 on localhost (HTTP + WebSocket)
 2. **Figma plugin** (this repo, the `plugin/` directory)
    - Runs *inside the Figma desktop sandbox* (or in the Figma web iframe)
@@ -33,7 +33,7 @@ These two deployment models are incompatible. The bridge is the simplest way to 
 | Concern | Where it runs |
 |---|---|
 | AI agent ↔ MCP protocol | MCP server (stdio) |
-| Tool registration (75 tools) | MCP server |
+| Tool registration (110 tools) | MCP server |
 | Zod schema validation | MCP server |
 | Request routing (fileKey → connection) | MCP server |
 | Per-IP rate limiting | MCP server (`/rpc` only) |

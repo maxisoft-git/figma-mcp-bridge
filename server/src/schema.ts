@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { extensionSchemas, extensionRpcToArgs } from "./extensions/index.js";
 
 /** Figma node IDs use colon-separated format, e.g. "4029:12345". Composite IDs for instances use semicolons, e.g. "4029:12345;4029:67890". */
 export const figmaNodeId = z
@@ -52,6 +53,20 @@ export const setNodePropertiesInput = z.object({
     .max(1)
     .optional()
     .describe("Optional solid fill opacity from 0 to 1"),
+  fileKey: fileKeyField,
+});
+
+export const createPageInput = z.object({
+  name: z
+    .string()
+    .trim()
+    .min(1)
+    .optional()
+    .describe("Optional page name (defaults to Figma's 'Page N')"),
+  setAsCurrent: z
+    .boolean()
+    .optional()
+    .describe("When true, switch the editor to the new page after creating it (default false)"),
   fileKey: fileKeyField,
 });
 
@@ -247,6 +262,9 @@ export const createImageInput = z.object({
 });
 
 export const toolInputSchemas = {
+  // Extension areas (variables / typography / components / sections). A core
+  // entry below overrides an extension one with the same tool name.
+  ...extensionSchemas,
   get_document: z.object({
     fileKey: fileKeyField,
     includeHidden: z.boolean().optional().describe("Include hidden nodes in the tree (default false)"),
@@ -259,6 +277,23 @@ export const toolInputSchemas = {
     includeHidden: z.boolean().optional().describe("Include hidden children in the tree (default false)"),
     includeImageData: z.boolean().optional().describe("Include actual image bytes for nodes with image fills (default false)"),
     enrich: z.boolean().optional().describe("Resolve style references and bound variables to human-readable names + values for accurate code generation (default false)"),
+  }),
+
+  get_layout_tree: z.object({
+    rootId: figmaNodeId.describe("Capture root node ID"),
+    maxNodes: z.number().int().min(1).max(10000).optional().describe("Maximum nodes to include (default 2000)"),
+    fileKey: fileKeyField,
+  }),
+
+  execute_code: z.object({
+    code: z
+      .string()
+      .min(1)
+      .max(100_000)
+      .describe(
+        "JavaScript to run in the Figma plugin sandbox against the Plugin API. The code runs inside an async function, so it may `await` and `return` a value; the returned value comes back JSON-safe."
+      ),
+    fileKey: fileKeyField,
   }),
 
   get_node: z.object({
@@ -285,6 +320,13 @@ export const toolInputSchemas = {
     includeHidden: z.boolean().optional().describe("Include hidden nodes (default false)"),
     includeImageData: z.boolean().optional().describe("Include actual image bytes for nodes with image fills (default false)"),
     enrich: z.boolean().optional().describe("Resolve style references and bound variables to human-readable names + values for accurate code generation (default false)"),
+    fileKey: fileKeyField,
+  }),
+  get_implementation_context: z.object({
+    nodeId: figmaNodeId.describe("The Figma node to turn into implementation context"),
+    maxDepth: z.number().int().min(0).max(12).optional().describe("Maximum layout-tree depth (default 4)"),
+    includeHtml: z.boolean().optional().describe("Include generated HTML with inline Figma CSS (default true)"),
+    includeCss: z.boolean().optional().describe("Include CSS for the root node (default true)"),
     fileKey: fileKeyField,
   }),
 
@@ -369,6 +411,8 @@ export const toolInputSchemas = {
         value.solidFillOpacity === undefined || value.solidFillHex !== undefined,
       "solidFillHex is required when solidFillOpacity is provided",
     ),
+
+  create_page: createPageInput,
 
   create_frame: createFrameInput
     .refine(
@@ -1067,6 +1111,37 @@ export const toolInputSchemas = {
 type ToolName = keyof typeof toolInputSchemas;
 
 /**
+ * Wire-format schema for create_image on the follower→leader RPC path.
+ *
+ * The tool handler resolves `source` (file path / URL / data URI) into
+ * `imageBase64` before forwarding, so the payload on the wire carries
+ * `imageBase64` and never `source`. `fileKey` is omitted too — it travels
+ * beside the params as a separate `sendWithParams` argument. Validating the
+ * wire payload against the advertised `createImageInput` (which requires
+ * `source`) rejected every follower create_image call with a 400.
+ */
+const createImageRpcInput = createImageInput
+  .omit({ source: true, fileKey: true })
+  .extend({
+    imageBase64: z
+      .string()
+      .min(1)
+      .describe(
+        "Base64-encoded image bytes, resolved from `source` by the tool handler"
+      ),
+  });
+
+/**
+ * Schemas the RPC path validates against. Tools whose handlers rewrite the
+ * payload before forwarding validate their wire shape here; every other tool
+ * validates against its advertised MCP input schema.
+ */
+const rpcInputSchemas = {
+  ...toolInputSchemas,
+  create_image: createImageRpcInput,
+} as const;
+
+/**
  * Maps the RPC wire format { tool, nodeIds?, params? } to each tool's
  * expected input shape. Typed as Record<ToolName, ...> so adding a schema
  * without a mapper is a compile error.
@@ -1075,12 +1150,17 @@ const rpcToArgs: Record<
   ToolName,
   (nodeIds?: string[], params?: Record<string, unknown>) => unknown
 > = {
+  // Extension mappers; a core mapper below overrides one with the same name.
+  ...extensionRpcToArgs,
   get_document: (_nodeIds, params) => ({ ...params }),
   get_selection: (_nodeIds, params) => ({ ...params }),
   get_node: (nodeIds, params) => ({ nodeId: nodeIds?.[0], ...params }),
+  get_layout_tree: (nodeIds, params) => ({ ...params, rootId: nodeIds?.[0] }),
+  execute_code: (_nodeIds, params) => ({ ...params }),
   get_styles: (_nodeIds, params) => ({ ...params }),
   get_metadata: (_nodeIds, params) => ({ ...params }),
   get_design_context: (_nodeIds, params) => ({ ...params }),
+  get_implementation_context: (nodeIds, params) => ({ nodeId: nodeIds?.[0], ...params }),
   get_variable_defs: (_nodeIds, params) => ({ ...params }),
   get_screenshot: (nodeIds, params) => ({ nodeIds, ...params }),
   save_node_json: (_nodeIds, params) => ({ ...params }),
@@ -1089,6 +1169,7 @@ const rpcToArgs: Record<
   set_text_properties: (nodeIds, params) => ({ nodeId: nodeIds?.[0], ...params }),
   set_node_properties: (nodeIds, params) => ({ nodeId: nodeIds?.[0], ...params }),
   create_frame: (_nodeIds, params) => ({ ...params }),
+  create_page: (_nodeIds, params) => ({ ...params }),
   create_text: (_nodeIds, params) => ({ ...params }),
   create_shape: (_nodeIds, params) => ({ ...params }),
   create_image: (_nodeIds, params) => ({ ...params }),
@@ -1167,10 +1248,10 @@ export function validateRpc(
   nodeIds?: string[],
   params?: Record<string, unknown>,
 ): string | null {
-  if (!(tool in toolInputSchemas)) return null;
+  if (!(tool in rpcInputSchemas)) return null;
 
   const name = tool as ToolName;
-  const result = toolInputSchemas[name].safeParse(
+  const result = rpcInputSchemas[name].safeParse(
     rpcToArgs[name](nodeIds, params),
   );
   return result.success ? null : result.error.issues[0].message;

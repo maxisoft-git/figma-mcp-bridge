@@ -1,6 +1,6 @@
 # MCP-сервер
 
-MCP-сервер — это **мост между AI-агентом и Figma-плагином**. Реализует [Model Context Protocol](https://modelcontextprotocol.io/) (stdio transport) и экспонирует 75 инструментов для работы с Figma. Также запускает HTTP + WebSocket-сервер на `localhost:1994`, к которому подключается Figma-плагин.
+MCP-сервер — это **мост между AI-агентом и Figma-плагином**. Реализует [Model Context Protocol](https://modelcontextprotocol.io/) (stdio transport) и экспонирует 110 инструментов для работы с Figma. Также запускает HTTP + WebSocket-сервер на `localhost:1994`, к которому подключается Figma-плагин.
 
 ## Архитектура
 

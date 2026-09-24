@@ -16,9 +16,15 @@ cd plugin && bun run dev
 - Server uses `tsc` directly (no bundler). Plugin uses Vite with two configs: `vite.config.ts` (UI) and `vite.config.main.ts` (main thread).
 - Both packages use `bun install` in CI. Plugin uses `bun` exclusively; server can use either `npm` or `bun`.
 
-## No Test Suite
+## Tests
 
-There are no tests. Don't try to run test/lint/typecheck commands—none are configured.
+Vitest is configured in both packages (`npm test` / `bun run test`); run them
+after touching the server or plugin main thread. The plugin also has
+`bun run typecheck` (`tsc --noEmit`), which currently reports a backlog of
+pre-existing type errors — treat it as a diagnostic, not a gate.
+
+The server keeps pure helpers (e.g. `ssrf.ts`) free of MCP-SDK imports so they
+can be unit-tested directly.
 
 ## Architecture
 

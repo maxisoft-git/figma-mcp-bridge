@@ -3,9 +3,12 @@ import type { ServerRequest, PluginResponse, RequestType } from "./types";
 import { handle as get_document } from "./handlers/get_document";
 import { handle as get_selection } from "./handlers/get_selection";
 import { handle as get_node } from "./handlers/get_node";
+import { handle as get_layout_tree } from "./handlers/get_layout_tree";
+import { handle as execute_code } from "./handlers/execute_code";
 import { handle as get_styles } from "./handlers/get_styles";
 import { handle as get_metadata } from "./handlers/get_metadata";
 import { handle as get_design_context } from "./handlers/get_design_context";
+import { handle as get_implementation_context } from "./handlers/get_implementation_context";
 import { handle as get_variable_defs } from "./handlers/get_variable_defs";
 import { handle as get_screenshot } from "./handlers/get_screenshot";
 import { handle as set_node_visibility } from "./handlers/set_node_visibility";
@@ -26,6 +29,7 @@ import { handle as set_blend_mode } from "./handlers/set_blend_mode";
 import { handle as set_clipping } from "./handlers/set_clipping";
 import { handle as flatten } from "./handlers/flatten";
 import { handle as set_auto_layout } from "./handlers/set_auto_layout";
+import { handle as create_page } from "./handlers/create_page";
 import { handle as set_current_page } from "./handlers/set_current_page";
 import { handle as find_nodes } from "./handlers/find_nodes";
 import { handle as create_group } from "./handlers/create_group";
@@ -93,6 +97,7 @@ import { handle as find_nodes_by_variable } from "./handlers/find_nodes_by_varia
 import { handle as storybook_import } from "./handlers/storybook_import";
 import { handle as spec_import } from "./handlers/spec_import";
 import { handle as export_icon_sprite } from "./handlers/export_icon_sprite";
+import { getExtensionHandler } from "./extensions";
 
 type Handler = (request: ServerRequest) => Promise<PluginResponse>;
 
@@ -100,9 +105,12 @@ const handlers: Record<RequestType, Handler> = {
   get_document,
   get_selection,
   get_node,
+  get_layout_tree,
+  execute_code,
   get_styles,
   get_metadata,
   get_design_context,
+  get_implementation_context,
   get_variable_defs,
   get_screenshot,
   set_node_visibility,
@@ -123,6 +131,7 @@ const handlers: Record<RequestType, Handler> = {
   set_clipping,
   flatten,
   set_auto_layout,
+  create_page,
   set_current_page,
   find_nodes,
   create_group,
@@ -196,9 +205,19 @@ const handlers: Record<RequestType, Handler> = {
 export const dispatch = async (
   request: ServerRequest
 ): Promise<PluginResponse> => {
+  // Core handlers win over extension handlers when both know a tool name, so
+  // the extension areas can only add tools, never change a core one.
   const handler = handlers[request.type as RequestType];
-  if (!handler) {
-    throw new Error(`Unknown request type: ${request.type}`);
+  if (handler) return handler(request);
+
+  const extension = getExtensionHandler(request.type);
+  if (extension) {
+    const data = await extension.run({
+      nodeIds: request.nodeIds,
+      params: request.params ?? {},
+    });
+    return { type: request.type, requestId: request.requestId, data };
   }
-  return handler(request);
+
+  throw new Error(`Unknown request type: ${request.type}`);
 };
